@@ -1,0 +1,75 @@
+name: nyama_client
+description: "NYAMA — Marketplace de livraison de cuisine camerounaise"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.5.0
+
+  # HTTP client
+  dio: ^5.4.0
+
+  # Navigation
+  go_router: ^14.0.0
+
+  # WebSocket temps réel
+  socket_io_client: ^3.0.0
+
+  # Stockage sécurisé tokens
+  flutter_secure_storage: ^9.0.0
+
+  # Cache images
+  cached_network_image: ^3.3.0
+
+  # GPS
+  geolocator: ^12.0.0
+
+  # Carte suivi livreur
+  google_maps_flutter: ^2.6.0
+
+  # Skeleton loaders
+  shimmer: ^3.0.0
+
+  # Formatage FCFA et dates
+  intl: ^0.19.0
+
+  # Saisie OTP
+  pin_code_fields: ^8.0.0
+
+  # Notation étoiles
+  flutter_rating_bar: ^4.0.0
+
+  # Appel téléphonique direct
+  url_launcher: ^6.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.0
+  flutter_native_splash: ^2.4.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#1B4332"
+  android: true
+  ios: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
