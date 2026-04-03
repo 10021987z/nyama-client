@@ -9,6 +9,7 @@ import 'features/home/screens/home_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
 import 'features/orders/screens/order_tracking_screen.dart';
+import 'features/rider_signup/screens/rider_signup_screen.dart';
 
 class App extends StatelessWidget {
   App({super.key});
@@ -73,6 +74,10 @@ class App extends StatelessWidget {
         builder: (context, state) => OrderTrackingScreen(
           orderId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: '/become-rider',
+        builder: (context, state) => const RiderSignupScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

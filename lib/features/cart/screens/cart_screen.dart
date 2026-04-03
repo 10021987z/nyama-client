@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../core/utils/validators.dart' show Validators;
@@ -19,11 +20,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   final _addressController = TextEditingController();
   final _repereController = TextEditingController();
   final _noteController = TextEditingController();
-  String _paymentMethod = 'cash';
+  String _paymentMethod = 'mtn_momo';
   String? _paymentPhone;
   bool _isOrdering = false;
   double? _lat;
   double? _lng;
+  String _deliverySpeed = 'standard';
 
   @override
   void dispose() {
@@ -39,15 +41,40 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final notifier = ref.read(cartProvider.notifier);
 
     return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: const Text('Mon panier'),
+        backgroundColor: AppColors.surfaceContainerLowest,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        title: Text(
+          'The Modern Griot',
+          style: GoogleFonts.newsreader(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.terracotta,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => context.pop(),
+        ),
         actions: [
-          if (cart.isNotEmpty)
-            TextButton(
-              onPressed: () => _confirmClear(context, notifier),
-              child: const Text('Vider',
-                  style: TextStyle(color: Colors.white70)),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.primaryLight,
+              child: Text(
+                'U',
+                style: GoogleFonts.newsreader(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
+          ),
         ],
       ),
       body: cart.isEmpty
@@ -55,120 +82,226 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           : Column(
               children: [
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // ── Nom de la cuisinière ───────────────────────────
-                      if (notifier.cookName != null)
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Title ─────────────────────────────────────────
+                        Text(
+                          'Paiement',
+                          style: GoogleFonts.newsreader(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Consultez votre sélection pour Savor Cameroon.',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ── Delivery Destination ─────────────────────────
+                        _SectionLabel(label: 'Destination de livraison'),
+                        const SizedBox(height: 10),
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.07),
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             children: [
-                              const Text('👩‍🍳',
-                                  style: TextStyle(fontSize: 16)),
-                              const SizedBox(width: 8),
-                              Text(
-                                notifier.cookName!,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primary,
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.location_on_rounded,
+                                    color: AppColors.primaryVibrant, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    TextField(
+                                      controller: _addressController,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.onSurface,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: 'Akwa, rue de la joie',
+                                        hintStyle: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          color: AppColors.textTertiary,
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        fillColor: Colors.transparent,
+                                        filled: false,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _fetchGps,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: AppColors.primaryVibrant,
+                                        width: 1.5),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    'MODIFIER',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primaryVibrant,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
 
-                      // ── Articles ───────────────────────────────────────
-                      ...List.generate(cart.length, (i) {
-                        final item = cart[i];
-                        return Column(
+                        const SizedBox(height: 24),
+
+                        // ── Order Summary ────────────────────────────────
+                        _SectionLabel(label: 'Résumé de la commande'),
+                        const SizedBox(height: 10),
+                        ...List.generate(cart.length, (i) {
+                          final item = cart[i];
+                          return _VibrantCartItem(
+                            item: item,
+                            onAdd: () => notifier.addItem(item),
+                            onRemove: () =>
+                                notifier.removeItem(item.menuItemId),
+                          );
+                        }),
+
+                        const SizedBox(height: 24),
+
+                        // ── Delivery Speed ───────────────────────────────
+                        _SectionLabel(label: 'Vitesse de Livraison'),
+                        const SizedBox(height: 10),
+                        Row(
                           children: [
-                            _CartItemTile(
-                              item: item,
-                              onAdd: () => notifier.addItem(item),
-                              onRemove: () =>
-                                  notifier.removeItem(item.menuItemId),
+                            Expanded(
+                              child: _DeliverySpeedChip(
+                                label: 'Standard (35-45 min)',
+                                isActive: _deliverySpeed == 'standard',
+                                onTap: () => setState(
+                                    () => _deliverySpeed = 'standard'),
+                              ),
                             ),
-                            if (i < cart.length - 1)
-                              const Divider(height: 1),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _DeliverySpeedChip(
+                                label: 'Prioritaire (15-25 min)',
+                                isActive: _deliverySpeed == 'priority',
+                                onTap: () => setState(
+                                    () => _deliverySpeed = 'priority'),
+                              ),
+                            ),
                           ],
-                        );
-                      }),
-
-                      const SizedBox(height: 24),
-                      const _SectionLabel(label: 'Livraison'),
-                      const SizedBox(height: 12),
-
-                      // ── Adresse ────────────────────────────────────────
-                      _AddressField(
-                        controller: _addressController,
-                        onGps: _fetchGps,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ── Repère ─────────────────────────────────────────
-                      TextField(
-                        controller: _repereController,
-                        decoration: const InputDecoration(
-                          labelText: 'Repère (optionnel)',
-                          hintText: 'Ex : Face pharmacie centrale',
-                          prefixIcon: Icon(Icons.place_outlined),
                         ),
-                      ),
 
-                      const SizedBox(height: 24),
-                      const _SectionLabel(label: 'Paiement'),
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 24),
 
-                      // ── Méthode de paiement ────────────────────────────
-                      _PaymentSelector(
-                        selected: _paymentMethod,
-                        phone: _paymentPhone,
-                        onMethodChanged: (m) =>
-                            setState(() => _paymentMethod = m),
-                        onPhoneChanged: (p) =>
-                            setState(() => _paymentPhone = p),
-                      ),
+                        // ── Payment Method ───────────────────────────────
+                        _SectionLabel(label: 'Mode de Paiement'),
+                        const SizedBox(height: 10),
+                        _VibrantPaymentSelector(
+                          selected: _paymentMethod,
+                          phone: _paymentPhone,
+                          onMethodChanged: (m) =>
+                              setState(() => _paymentMethod = m),
+                          onPhoneChanged: (p) =>
+                              setState(() => _paymentPhone = p),
+                        ),
 
-                      const SizedBox(height: 24),
-                      const _SectionLabel(label: 'Note pour la cuisinière'),
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 24),
 
-                      // ── Note cuisinière ────────────────────────────────
-                      TextField(
-                        controller: _noteController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                          hintText: 'Ex : Pas trop épicé, sans oignons...',
-                          prefixIcon: Padding(
-                            padding: EdgeInsets.only(bottom: 20),
-                            child: Icon(Icons.edit_note),
+                        // ── Note for cook ────────────────────────────────
+                        _SectionLabel(label: 'Note pour la cuisinière'),
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: TextField(
+                            controller: _noteController,
+                            maxLines: 2,
+                            style: GoogleFonts.inter(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Ex : Pas trop épicé, sans oignons...',
+                              hintStyle: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: AppColors.textTertiary),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              fillColor: Colors.transparent,
+                              filled: false,
+                              contentPadding: const EdgeInsets.all(16),
+                            ),
                           ),
                         ),
-                      ),
 
-                      const SizedBox(height: 16),
-                    ],
+                        const SizedBox(height: 24),
+
+                        // ── Summary ──────────────────────────────────────
+                        _VibrantSummary(
+                          subtotal: notifier.totalXaf,
+                          deliveryFee: _deliverySpeed == 'priority'
+                              ? 1200
+                              : 0,
+                        ),
+
+                        const SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
 
-                // ── Récapitulatif ──────────────────────────────────────
-                _CartSummary(
-                  itemCount: notifier.itemCount,
-                  total: notifier.totalXaf,
+                // ── Bottom CTA ─────────────────────────────────────────
+                _BottomCta(
+                  total: _calculateTotal(notifier.totalXaf),
                   isOrdering: _isOrdering,
                   onOrder: () => _placeOrder(context, notifier),
                 ),
               ],
             ),
     );
+  }
+
+  int _calculateTotal(int subtotal) {
+    final deliveryFee = _deliverySpeed == 'priority' ? 1200 : 0;
+    final serviceFee = (subtotal * 0.015).round();
+    return subtotal + deliveryFee + serviceFee;
   }
 
   Future<void> _fetchGps() async {
@@ -181,7 +314,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Accès à la localisation refusé définitivement')),
+                content:
+                    Text('Accès à la localisation refusé définitivement')),
           );
         }
         return;
@@ -208,7 +342,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       BuildContext context, CartNotifier notifier) async {
     if (_addressController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez saisir une adresse de livraison')),
+        const SnackBar(
+            content: Text('Veuillez saisir une adresse de livraison')),
       );
       return;
     }
@@ -216,7 +351,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     if ((_paymentMethod == 'orange_money' || _paymentMethod == 'mtn_momo') &&
         (_paymentPhone == null || _paymentPhone!.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez saisir votre numéro de paiement')),
+        const SnackBar(
+            content: Text('Veuillez saisir votre numéro de paiement')),
       );
       return;
     }
@@ -265,38 +401,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       if (mounted) setState(() => _isOrdering = false);
     }
   }
-
-  void _confirmClear(BuildContext context, CartNotifier notifier) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Vider le panier ?'),
-        content: const Text('Tous vos articles seront supprimés.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              minimumSize: Size.zero,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            ),
-            onPressed: () {
-              notifier.clearCart();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Vider'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ─── Widgets internes ─────────────────────────────────────────────────────────
+// ─── Section Label ───────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
   final String label;
@@ -306,45 +413,227 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: Theme.of(context)
-          .textTheme
-          .titleMedium
-          ?.copyWith(fontWeight: FontWeight.w700),
+      style: GoogleFonts.newsreader(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        fontStyle: FontStyle.italic,
+        color: AppColors.onSurface,
+      ),
     );
   }
 }
 
-class _AddressField extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onGps;
+// ─── Vibrant Cart Item ───────────────────────────────────────────────────
 
-  const _AddressField({required this.controller, required this.onGps});
+class _VibrantCartItem extends StatelessWidget {
+  final CartItem item;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
+
+  const _VibrantCartItem({
+    required this.item,
+    required this.onAdd,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: 'Adresse de livraison *',
-        hintText: 'Ex : Akwa, rue de la joie',
-        prefixIcon: const Icon(Icons.location_on_outlined),
-        suffixIcon: IconButton(
-          icon: const Icon(Icons.my_location, color: AppColors.primary),
-          tooltip: 'Utiliser ma position',
-          onPressed: onGps,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          // Round image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: item.imageUrl != null
+                  ? Image.network(
+                      item.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, e, _) => _placeholder(),
+                    )
+                  : _placeholder(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.newsreader(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.cookName,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.tertiary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'ÉPICES SIGNATURE',
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.tertiary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Price + qty
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                (item.priceXaf * item.quantity).toFcfa(),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryVibrant,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CounterBtn(
+                      icon: Icons.remove, onTap: onRemove),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      'Qté : ${item.quantity}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  _CounterBtn(icon: Icons.add, onTap: onAdd),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      color: AppColors.primaryLight,
+      child: const Icon(Icons.restaurant, color: AppColors.primaryVibrant),
+    );
+  }
+}
+
+// ─── Counter Button ──────────────────────────────────────────────────────
+
+class _CounterBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CounterBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: AppColors.primaryVibrant.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 14, color: AppColors.primaryVibrant),
+      ),
+    );
+  }
+}
+
+// ─── Delivery Speed Chip ─────────────────────────────────────────────────
+
+class _DeliverySpeedChip extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _DeliverySpeedChip({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.surfaceContainerLowest
+              : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: isActive
+              ? Border.all(color: AppColors.textTertiary, width: 1.5)
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              color: isActive
+                  ? AppColors.onSurface
+                  : AppColors.textSecondary,
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _PaymentSelector extends StatefulWidget {
+// ─── Payment Selector ────────────────────────────────────────────────────
+
+class _VibrantPaymentSelector extends StatefulWidget {
   final String selected;
   final String? phone;
   final ValueChanged<String> onMethodChanged;
   final ValueChanged<String?> onPhoneChanged;
 
-  const _PaymentSelector({
+  const _VibrantPaymentSelector({
     required this.selected,
     required this.phone,
     required this.onMethodChanged,
@@ -352,10 +641,11 @@ class _PaymentSelector extends StatefulWidget {
   });
 
   @override
-  State<_PaymentSelector> createState() => _PaymentSelectorState();
+  State<_VibrantPaymentSelector> createState() =>
+      _VibrantPaymentSelectorState();
 }
 
-class _PaymentSelectorState extends State<_PaymentSelector> {
+class _VibrantPaymentSelectorState extends State<_VibrantPaymentSelector> {
   final _phoneController = TextEditingController();
 
   @override
@@ -366,173 +656,268 @@ class _PaymentSelectorState extends State<_PaymentSelector> {
 
   @override
   Widget build(BuildContext context) {
-    final methods = [
-      ('orange_money', '🟠 Orange Money'),
-      ('mtn_momo', '🟡 MTN MoMo'),
-      ('cash', '💵 Espèces'),
-    ];
-
-    return RadioGroup<String>(
-      groupValue: widget.selected,
-      onChanged: (v) {
-        if (v != null) {
-          widget.onMethodChanged(v);
-          if (v == 'cash') widget.onPhoneChanged(null);
-        }
-      },
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Column(
-      children: [
-        ...methods.map((m) {
-          final value = m.$1;
-          final label = m.$2;
-          return RadioListTile<String>(
-            value: value,
-            dense: true,
-            activeColor: AppColors.primary,
-            title: Text(label, style: const TextStyle(fontSize: 14)),
-            contentPadding: EdgeInsets.zero,
-          );
-        }),
-        if (widget.selected == 'orange_money' ||
-            widget.selected == 'mtn_momo') ...[
-          const SizedBox(height: 4),
-          TextField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            onChanged: (v) {
-              final normalized = Validators.normalizePhone(v);
-              widget.onPhoneChanged(normalized);
-              // Auto-switch if prefix detected
-              if (Validators.isOrangeMoney(v) && widget.selected != 'orange_money') {
-                widget.onMethodChanged('orange_money');
-              } else if (Validators.isMtnMomo(v) && widget.selected != 'mtn_momo') {
-                widget.onMethodChanged('mtn_momo');
-              }
-            },
-            decoration: InputDecoration(
-              labelText:
-                  'Numéro ${widget.selected == 'orange_money' ? 'Orange' : 'MTN'} *',
-              hintText: '6XXXXXXXX',
-              prefixIcon: const Icon(Icons.phone_outlined),
-            ),
-          ),
-        ],
-      ],
-    ));
-  }
-}
-
-class _EmptyCart extends StatelessWidget {
-  const _EmptyCart();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('🛒', style: TextStyle(fontSize: 64)),
-          SizedBox(height: 16),
-          Text(
-            'Votre panier est vide',
-            style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary),
+          _PaymentOption(
+            icon: Icons.phone_android,
+            iconColor: const Color(0xFFFFCC00),
+            label: 'MTN Mobile Money',
+            value: 'mtn_momo',
+            selected: widget.selected,
+            onTap: () => widget.onMethodChanged('mtn_momo'),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Ajoutez des plats depuis l\'accueil',
-            style: TextStyle(color: AppColors.textSecondary),
+          const Divider(height: 1, indent: 56),
+          _PaymentOption(
+            icon: Icons.phone_android,
+            iconColor: AppColors.primaryVibrant,
+            label: 'Orange Money',
+            value: 'orange_money',
+            selected: widget.selected,
+            onTap: () => widget.onMethodChanged('orange_money'),
           ),
+          const Divider(height: 1, indent: 56),
+          _PaymentOption(
+            icon: Icons.payments_outlined,
+            iconColor: AppColors.textSecondary,
+            label: 'Paiement à la livraison',
+            value: 'cash',
+            selected: widget.selected,
+            onTap: () {
+              widget.onMethodChanged('cash');
+              widget.onPhoneChanged(null);
+            },
+          ),
+          if (widget.selected == 'orange_money' ||
+              widget.selected == 'mtn_momo') ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                style: GoogleFonts.inter(fontSize: 14),
+                onChanged: (v) {
+                  final normalized = Validators.normalizePhone(v);
+                  widget.onPhoneChanged(normalized);
+                  if (Validators.isOrangeMoney(v) &&
+                      widget.selected != 'orange_money') {
+                    widget.onMethodChanged('orange_money');
+                  } else if (Validators.isMtnMomo(v) &&
+                      widget.selected != 'mtn_momo') {
+                    widget.onMethodChanged('mtn_momo');
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText:
+                      'Numéro ${widget.selected == 'orange_money' ? 'Orange' : 'MTN'} (+237)',
+                  hintText: '6XXXXXXXX',
+                  labelStyle: GoogleFonts.inter(
+                      fontSize: 13, color: AppColors.textSecondary),
+                  hintStyle: GoogleFonts.inter(
+                      fontSize: 14, color: AppColors.textTertiary),
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                  filled: true,
+                  fillColor: AppColors.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.primaryVibrant, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _CartItemTile extends StatelessWidget {
-  final CartItem item;
-  final VoidCallback onAdd;
-  final VoidCallback onRemove;
+class _PaymentOption extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final String selected;
+  final VoidCallback onTap;
 
-  const _CartItemTile({
-    required this.item,
-    required this.onAdd,
-    required this.onRemove,
+  const _PaymentOption({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 60,
-              height: 60,
-              child: item.imageUrl != null
-                  ? Image.network(
-                      item.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, url, error) => Container(
-                        color: AppColors.surface,
-                        child: const Center(
-                            child: Text('🍽️',
-                                style: TextStyle(fontSize: 24))),
+    final isSelected = value == selected;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 24),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onSurface,
+                ),
+              ),
+            ),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.primaryVibrant
+                      : AppColors.textTertiary,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? Center(
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primaryVibrant,
+                        ),
                       ),
                     )
-                  : Container(
-                      color: AppColors.surface,
-                      child: const Center(
-                          child: Text('🍽️',
-                              style: TextStyle(fontSize: 24))),
-                    ),
+                  : null,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Vibrant Summary ─────────────────────────────────────────────────────
+
+class _VibrantSummary extends StatelessWidget {
+  final int subtotal;
+  final int deliveryFee;
+
+  const _VibrantSummary({
+    required this.subtotal,
+    required this.deliveryFee,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final serviceFee = (subtotal * 0.015).round();
+    final total = subtotal + deliveryFee + serviceFee;
+    final isFreeDelivery = deliveryFee == 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          _SummaryRow(
+            label: 'Sous-total',
+            value: subtotal.toFcfa(),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(item.priceXaf.toFcfa(),
-                    style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13)),
-              ],
-            ),
-          ),
+          const SizedBox(height: 10),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _SmallCounterBtn(icon: Icons.remove, onTap: onRemove),
-              SizedBox(
-                width: 32,
-                child: Text('${item.quantity}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 15)),
+              isFreeDelivery
+                  ? Text(
+                      'Frais de livraison',
+                      style: GoogleFonts.newsreader(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.terracotta,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    )
+                  : Text(
+                      'Frais de livraison',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+              Text(
+                isFreeDelivery ? 'Gratuit' : deliveryFee.toFcfa(),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      isFreeDelivery ? AppColors.success : AppColors.onSurface,
+                ),
               ),
-              _SmallCounterBtn(icon: Icons.add, onTap: onAdd),
             ],
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 80,
-            child: Text(
-              (item.priceXaf * item.quantity).toFcfa(),
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 13),
-            ),
+          const SizedBox(height: 10),
+          _SummaryRow(
+            label: 'Taxe de service (1.5%)',
+            value: serviceFee.toFcfa(),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onSurface,
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    total.toFcfa(),
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryVibrant,
+                    ),
+                  ),
+                  Text(
+                    'TVA incluse',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -540,37 +925,45 @@ class _CartItemTile extends StatelessWidget {
   }
 }
 
-class _SmallCounterBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const _SmallCounterBtn({required this.icon, required this.onTap});
+  const _SummaryRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
         ),
-        child: Icon(icon, size: 16, color: AppColors.primary),
-      ),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _CartSummary extends StatelessWidget {
-  final int itemCount;
+// ─── Bottom CTA ──────────────────────────────────────────────────────────
+
+class _BottomCta extends StatelessWidget {
   final int total;
   final bool isOrdering;
   final VoidCallback onOrder;
 
-  const _CartSummary({
-    required this.itemCount,
+  const _BottomCta({
     required this.total,
     required this.isOrdering,
     required this.onOrder,
@@ -579,56 +972,27 @@ class _CartSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
         boxShadow: [
           BoxShadow(
-              color: Color(0x14000000), blurRadius: 8, offset: Offset(0, -2))
+            color: AppColors.onSurface.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('$itemCount article${itemCount > 1 ? 's' : ''}',
-                  style: const TextStyle(color: AppColors.textSecondary)),
-              Text(total.toFcfa(),
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
+      child: GestureDetector(
+        onTap: isOrdering ? null : onOrder,
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: isOrdering ? null : AppColors.primaryGradient,
+            color: isOrdering ? AppColors.textTertiary : null,
+            borderRadius: BorderRadius.circular(28),
           ),
-          const SizedBox(height: 4),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Livraison',
-                  style: TextStyle(color: AppColors.textSecondary)),
-              Text('Gratuite',
-                  style: TextStyle(
-                      color: AppColors.success, fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Total',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 16)),
-              Text(total.toFcfa(),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 18,
-                      color: AppColors.primary)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ElevatedButton(
-            onPressed: isOrdering ? null : onOrder,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-            ),
+          child: Center(
             child: isOrdering
                 ? const SizedBox(
                     width: 22,
@@ -638,8 +1002,58 @@ class _CartSummary extends StatelessWidget {
                       color: Colors.white,
                     ),
                   )
-                : Text('Commander · ${total.toFcfa()}',
-                    style: const TextStyle(fontSize: 16)),
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Commander • ${total.toFcfa()}',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded,
+                          color: Colors.white, size: 20),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Empty Cart ──────────────────────────────────────────────────────────
+
+class _EmptyCart extends StatelessWidget {
+  const _EmptyCart();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shopping_cart_outlined,
+              size: 64, color: AppColors.textTertiary.withValues(alpha: 0.5)),
+          const SizedBox(height: 16),
+          Text(
+            'Votre panier est vide',
+            style: GoogleFonts.newsreader(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ajoutez des plats depuis l\'accueil',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),

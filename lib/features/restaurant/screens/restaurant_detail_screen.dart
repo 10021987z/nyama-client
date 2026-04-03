@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
@@ -26,7 +26,7 @@ class RestaurantDetailScreen extends ConsumerWidget {
       body: cookAsync.when(
         loading: () => const _LoadingView(),
         error: (e, _) => Scaffold(
-          appBar: AppBar(title: const Text('Cuisinière')),
+          appBar: AppBar(title: const Text('Restaurant')),
           body: NyamaErrorWidget(
             message: e.toString(),
             onRetry: () => ref.invalidate(cookDetailProvider(restaurantId)),
@@ -44,7 +44,7 @@ class RestaurantDetailScreen extends ConsumerWidget {
 
 // ─── Vue principale ───────────────────────────────────────────────────────
 
-class _CookDetailView extends StatelessWidget {
+class _CookDetailView extends StatefulWidget {
   final Cook cook;
   final List<CartItem> cart;
   final CartNotifier cartNotifier;
@@ -55,93 +55,178 @@ class _CookDetailView extends StatelessWidget {
     required this.cartNotifier,
   });
 
-  /// Regroupe les plats par catégorie
+  @override
+  State<_CookDetailView> createState() => _CookDetailViewState();
+}
+
+class _CookDetailViewState extends State<_CookDetailView>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  late final Map<String, List<MenuItem>> _grouped;
+  late final List<String> _categories;
+
+  @override
+  void initState() {
+    super.initState();
+    _grouped = _groupedMenu();
+    _categories = _grouped.keys.toList();
+    _tabController = TabController(length: _categories.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Map<String, List<MenuItem>> _groupedMenu() {
     final map = <String, List<MenuItem>>{};
-    for (final item in cook.menuItems) {
-      final cat = item.category ?? 'Autres';
+    // Put "Les Plus Populaires" first if any daily specials
+    final specials =
+        widget.cook.menuItems.where((i) => i.isDailySpecial).toList();
+    if (specials.isNotEmpty) {
+      map['Les Plus Populaires'] = specials;
+    }
+    for (final item in widget.cook.menuItems) {
+      final cat = item.category ?? 'Plats Principaux';
       (map[cat] ??= []).add(item);
+    }
+    if (map.isEmpty) {
+      map['Plats Principaux'] = [];
     }
     return map;
   }
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _groupedMenu();
-    final cartCount = cart.fold(0, (s, i) => s + i.quantity);
-    final cartTotal = cart.fold(0, (s, i) => s + i.priceXaf * i.quantity);
-
-    // Construit la liste de sections à afficher
-    final sections = <Widget>[];
-    sections.add(_HoursSection(cook: cook));
-    sections.add(const SizedBox(height: 16));
-
-    for (final entry in grouped.entries) {
-      sections.add(_CategoryHeader(title: entry.key));
-      for (final item in entry.value) {
-        sections.add(Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _MenuItemRow(
-            item: item,
-            quantity: cart
-                .where((i) => i.menuItemId == item.id)
-                .fold(0, (s, i) => s + i.quantity),
-            onAdd: () => _handleAdd(context, item),
-            onRemove: () => cartNotifier.removeItem(item.id),
-          ),
-        ));
-      }
-      sections.add(const SizedBox(height: 12));
-    }
-
-    if (cook.menuItems.isEmpty) {
-      sections.add(const NyamaErrorWidget(
-        emoji: '🍽️',
-        message: 'Aucun plat disponible pour le moment',
-      ));
-    }
+    final cartCount =
+        widget.cart.fold(0, (s, i) => s + i.quantity);
+    final cartTotal =
+        widget.cart.fold(0, (s, i) => s + i.priceXaf * i.quantity);
 
     return Scaffold(
+      backgroundColor: AppColors.surface,
       body: Stack(
         children: [
-          CustomScrollView(
-            slivers: [
-              // ── Header gradient ──────────────────────────────────────
+          NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              // ── Hero header ────────────────────────────────────────
               SliverAppBar(
-                expandedHeight: 240,
+                expandedHeight: 300,
                 pinned: true,
                 backgroundColor: AppColors.primary,
-                leading: CircleAvatar(
-                  backgroundColor: Colors.black26,
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () =>
-                        Navigator.of(context).canPop() ? Navigator.of(context).pop() : null,
+                leading: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black38,
+                    child: IconButton(
+                      icon:
+                          const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      onPressed: () => Navigator.of(context).canPop()
+                          ? Navigator.of(context).pop()
+                          : null,
+                    ),
                   ),
                 ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black38,
+                      child: IconButton(
+                        icon: const Icon(Icons.share, color: Colors.white, size: 20),
+                        onPressed: () {},
+                      ),
+                    ),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
-                  background: _CookHeader(cook: cook),
+                  background: _HeroHeader(cook: widget.cook),
                 ),
               ),
 
-              // ── Menu ─────────────────────────────────────────────────
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                    16, 16, 16, cartCount > 0 ? 96 : 24),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate(sections),
+              // ── Tabs ───────────────────────────────────────────────
+              if (_categories.length > 1)
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _TabBarDelegate(
+                    tabBar: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      labelColor: AppColors.primaryVibrant,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      indicatorColor: AppColors.primaryVibrant,
+                      indicatorWeight: 3,
+                      labelStyle: GoogleFonts.newsreader(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      unselectedLabelStyle: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      labelPadding:
+                          const EdgeInsets.symmetric(horizontal: 16),
+                      tabs: _categories
+                          .map((c) => Tab(text: c))
+                          .toList(),
+                    ),
+                  ),
                 ),
-              ),
             ],
+            body: TabBarView(
+              controller: _tabController,
+              children: _categories.map((cat) {
+                final items = _grouped[cat] ?? [];
+                if (items.isEmpty) {
+                  return const Center(
+                    child: NyamaErrorWidget(
+                      emoji: '🍽️',
+                      message: 'Aucun plat disponible pour le moment',
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  padding: EdgeInsets.fromLTRB(
+                      16, 16, 16, cartCount > 0 ? 100 : 24),
+                  itemCount: items.length + 1, // +1 for section header
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _SectionHeader(
+                        title: cat,
+                        subtitle:
+                            '${items.length} plat${items.length > 1 ? 's' : ''} disponible${items.length > 1 ? 's' : ''}',
+                      );
+                    }
+                    final item = items[index - 1];
+                    final qty = widget.cart
+                        .where((i) => i.menuItemId == item.id)
+                        .fold(0, (s, i) => s + i.quantity);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _VibrantMenuCard(
+                        item: item,
+                        quantity: qty,
+                        onAdd: () => _handleAdd(context, item),
+                        onRemove: () =>
+                            widget.cartNotifier.removeItem(item.id),
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
+            ),
           ),
 
-          // ── FAB panier ───────────────────────────────────────────────
+          // ── Sticky cart bar ─────────────────────────────────────────
           if (cartCount > 0)
             Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: _CartFab(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _StickyCartBar(
                 count: cartCount,
                 total: cartTotal,
               ),
@@ -153,13 +238,13 @@ class _CookDetailView extends StatelessWidget {
 
   void _handleAdd(BuildContext context, MenuItem item) {
     try {
-      cartNotifier.addItem(CartItem(
+      widget.cartNotifier.addItem(CartItem(
         menuItemId: item.id,
         name: item.name,
         priceXaf: item.priceXaf,
         quantity: 1,
         cookId: item.cook?.id ?? '',
-        cookName: item.cook?.displayName ?? cook.displayName,
+        cookName: item.cook?.displayName ?? widget.cook.displayName,
         imageUrl: item.imageUrl,
       ));
     } on CartConflictException catch (e) {
@@ -171,9 +256,10 @@ class _CookDetailView extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Panier différent'),
-        content: Text(e.message),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Panier différent',
+            style: GoogleFonts.newsreader(fontWeight: FontWeight.w700)),
+        content: Text(e.message, style: GoogleFonts.inter(fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -182,11 +268,10 @@ class _CookDetailView extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               minimumSize: Size.zero,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             onPressed: () {
-              cartNotifier.clearCart();
+              widget.cartNotifier.clearCart();
               Navigator.pop(dialogContext);
             },
             child: const Text('Vider et commander ici'),
@@ -197,245 +282,268 @@ class _CookDetailView extends StatelessWidget {
   }
 }
 
-// ─── Widgets internes ─────────────────────────────────────────────────────
+// ─── Hero Header ─────────────────────────────────────────────────────────
 
-class _CookHeader extends StatelessWidget {
+class _HeroHeader extends StatelessWidget {
   final Cook cook;
 
-  const _CookHeader({required this.cook});
+  const _HeroHeader({required this.cook});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.primaryDark, AppColors.primary],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Background image / placeholder
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF5C3400), Color(0xFF884D00)],
+            ),
+          ),
+          child: const Center(
+            child: Text('🍽️', style: TextStyle(fontSize: 64)),
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 72, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Nom + statut
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    cook.displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: cook.isOpenNow
-                        ? AppColors.success
-                        : AppColors.error,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    cook.isOpenNow ? 'Ouvert' : 'Fermé',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
 
-            const SizedBox(height: 8),
-
-            // Spécialités chips
-            if (cook.specialty.isNotEmpty)
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: cook.specialty
-                    .take(4)
-                    .map((s) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 3),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: Colors.white54),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(s,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12)),
-                        ))
-                    .toList(),
+        // Gradient overlay sombre en bas
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.3),
+                  Colors.black.withValues(alpha: 0.85),
+                ],
+                stops: const [0.0, 0.35, 0.6, 1.0],
               ),
-
-            const SizedBox(height: 10),
-
-            // Rating + orders + landmark
-            Row(
-              children: [
-                RatingBarIndicator(
-                  rating: cook.avgRating,
-                  itemSize: 14,
-                  itemBuilder: (context, index) => const Icon(
-                    Icons.star,
-                    color: AppColors.secondary,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${cook.avgRating.toStringAsFixed(1)} · ${cook.totalOrders} commandes',
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 13),
-                ),
-              ],
             ),
-            if (cook.landmark != null) ...[
-              const SizedBox(height: 4),
+          ),
+        ),
+
+        // Content overlay
+        Positioned(
+          bottom: 20,
+          left: 16,
+          right: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Badges row
               Row(
                 children: [
-                  const Icon(Icons.location_on,
-                      color: Colors.white60, size: 14),
-                  const SizedBox(width: 4),
-                  Expanded(
+                  // Rating badge
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryVibrant,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, size: 14, color: Colors.white),
+                        const SizedBox(width: 3),
+                        Text(
+                          cook.avgRating.toStringAsFixed(1),
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Delivery badge
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryVibrant,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.delivery_dining,
+                            size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          '25-35 min',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  // Open/Closed
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: cook.isOpenNow ? AppColors.success : AppColors.error,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: Text(
-                      cook.landmark!,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      cook.isOpenNow ? 'Ouvert' : 'Fermé',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // Restaurant name
+              Text(
+                cook.displayName,
+                style: GoogleFonts.newsreader(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+
+              const SizedBox(height: 4),
+
+              // Specialties subtitle
+              if (cook.specialty.isNotEmpty)
+                Text(
+                  cook.specialty.take(3).join(' · '),
+                  style: GoogleFonts.inter(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+
+              const SizedBox(height: 6),
+
+              // Orders + landmark
+              Row(
+                children: [
+                  Text(
+                    '${cook.totalOrders} commandes',
+                    style: GoogleFonts.inter(
+                        color: Colors.white60, fontSize: 12),
+                  ),
+                  if (cook.landmark != null) ...[
+                    const SizedBox(width: 8),
+                    const Icon(Icons.location_on,
+                        color: Colors.white60, size: 13),
+                    const SizedBox(width: 2),
+                    Flexible(
+                      child: Text(
+                        cook.landmark!,
+                        style: GoogleFonts.inter(
+                            color: Colors.white60, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _HoursSection extends StatelessWidget {
-  final Cook cook;
+// ─── Tab bar delegate ────────────────────────────────────────────────────
 
-  const _HoursSection({required this.cook});
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
 
-  static const _daysFr = {
-    'monday': 'Lundi',
-    'tuesday': 'Mardi',
-    'wednesday': 'Mercredi',
-    'thursday': 'Jeudi',
-    'friday': 'Vendredi',
-    'saturday': 'Samedi',
-    'sunday': 'Dimanche',
-  };
-  static const _dayOrder = [
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
-  ];
-  static const _todayKeys = [
-    'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'
-  ];
+  const _TabBarDelegate({required this.tabBar});
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: AppColors.surface,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate oldDelegate) => false;
+}
+
+// ─── Section header ──────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
-    if (cook.openingHours.isEmpty) return const SizedBox.shrink();
-
-    final todayKey = _todayKeys[DateTime.now().weekday % 7];
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Horaires',
-              style: TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 14)),
-          const SizedBox(height: 8),
-          ..._dayOrder
-              .where((d) => cook.openingHours.containsKey(d))
-              .map((d) {
-            final hours = cook.openingHours[d]!;
-            final isToday = d == todayKey;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 90,
-                    child: Text(
-                      _daysFr[d] ?? d,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isToday
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                        color: isToday
-                            ? AppColors.primary
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    hours.closed
-                        ? 'Fermé'
-                        : '${hours.open} – ${hours.close}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: hours.closed
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
-                      fontWeight: isToday
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+          Text(
+            title,
+            style: GoogleFonts.newsreader(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              fontStyle: FontStyle.italic,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _CategoryHeader extends StatelessWidget {
-  final String title;
+// ─── Menu Card vibrant (asymétrique avec image cutout) ────────────────────
 
-  const _CategoryHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleLarge,
-      ),
-    );
-  }
-}
-
-class _MenuItemRow extends StatelessWidget {
+class _VibrantMenuCard extends StatelessWidget {
   final MenuItem item;
   final int quantity;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
 
-  const _MenuItemRow({
+  const _VibrantMenuCard({
     required this.item,
     required this.quantity,
     required this.onAdd,
@@ -448,156 +556,182 @@ class _MenuItemRow extends StatelessWidget {
 
     return Opacity(
       opacity: canOrder ? 1.0 : 0.55,
-      child: Container(
-        height: 110,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 4,
-                offset: Offset(0, 1)),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            children: [
-              // Texte
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
+      child: SizedBox(
+        height: 150,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Card body
+            Container(
+              height: 150,
+              padding: const EdgeInsets.fromLTRB(20, 16, 110, 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.onSurface.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Name + description
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.name,
-                              style: Theme.of(context).textTheme.titleMedium,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          if (item.description != null) ...[
-                            const SizedBox(height: 3),
-                            Text(item.description!,
-                                style: Theme.of(context).textTheme.bodySmall,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis),
-                          ],
-                          if (item.prepTimeMin != null) ...[
-                            const SizedBox(height: 4),
-                            Row(children: [
-                              const Icon(Icons.schedule,
-                                  size: 11,
-                                  color: AppColors.textSecondary),
-                              const SizedBox(width: 3),
-                              Text('${item.prepTimeMin} min',
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary)),
-                            ]),
-                          ],
-                        ],
+                      Text(
+                        item.name,
+                        style: GoogleFonts.newsreader(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            item.priceXaf.toFcfa(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(color: AppColors.primary),
+                      if (item.description != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          item.description!,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            height: 1.3,
                           ),
-                          if (!canOrder)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppColors.textSecondary
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text('Épuisé',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w600)),
-                            )
-                          else if (quantity == 0)
-                            GestureDetector(
-                              onTap: onAdd,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(20),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  // Price + add button
+                  Row(
+                    children: [
+                      Text(
+                        item.priceXaf.toFcfa(),
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryVibrant,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (!canOrder)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.textSecondary
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text('Épuisé',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              )),
+                        )
+                      else if (quantity == 0)
+                        GestureDetector(
+                          onTap: onAdd,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryVibrant,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryVibrant
+                                      .withValues(alpha: 0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
-                                child: const Text('+ Ajouter',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                            child: const Icon(Icons.add,
+                                color: Colors.white, size: 24),
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            _CounterBtn(icon: Icons.remove, onTap: onRemove),
+                            SizedBox(
+                              width: 28,
+                              child: Text(
+                                '$quantity',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
                               ),
-                            )
-                          else
-                            Row(children: [
-                              _CounterBtn(icon: Icons.remove, onTap: onRemove),
-                              SizedBox(
-                                width: 28,
-                                child: Text('$quantity',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w700)),
-                              ),
-                              _CounterBtn(icon: Icons.add, onTap: onAdd),
-                            ]),
-                        ],
+                            ),
+                            _CounterBtn(icon: Icons.add, onTap: onAdd),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Circular cutout image — overflows right
+            Positioned(
+              right: -10,
+              top: 15,
+              child: Hero(
+                tag: 'menu-${item.id}',
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.onSurface.withValues(alpha: 0.15),
+                        blurRadius: 12,
+                        offset: const Offset(-2, 4),
                       ),
                     ],
                   ),
-                ),
-              ),
-
-              // Image
-              Hero(
-                tag: 'menu-${item.id}',
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.horizontal(
-                      right: Radius.circular(12)),
-                  child: SizedBox(
-                    width: 110,
-                    height: 110,
+                  child: ClipOval(
                     child: item.imageUrl != null
                         ? Image.network(
                             item.imageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, url, error) => Container(
-                              color: AppColors.surface,
-                              child: const Center(
-                                  child: Text('🍽️',
-                                      style: TextStyle(fontSize: 32))),
-                            ),
+                            errorBuilder: (_, e, _) => _imagePlaceholder(),
                           )
-                        : Container(
-                            color: AppColors.surface,
-                            child: const Center(
-                                child: Text('🍽️',
-                                    style: TextStyle(fontSize: 32))),
-                          ),
+                        : _imagePlaceholder(),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      color: AppColors.primaryLight,
+      child: const Center(
+        child: Text('🍽️', style: TextStyle(fontSize: 36)),
+      ),
+    );
+  }
 }
+
+// ─── Counter button ──────────────────────────────────────────────────────
 
 class _CounterBtn extends StatelessWidget {
   final IconData icon;
@@ -610,77 +744,123 @@ class _CounterBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 28,
-        height: 28,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          color: AppColors.primaryVibrant.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 16, color: AppColors.primary),
+        child: Icon(icon, size: 18, color: AppColors.primaryVibrant),
       ),
     );
   }
 }
 
-class _CartFab extends StatelessWidget {
+// ─── Sticky Cart Bar ─────────────────────────────────────────────────────
+
+class _StickyCartBar extends StatelessWidget {
   final int count;
   final int total;
 
-  const _CartFab({required this.count, required this.total});
+  const _StickyCartBar({required this.count, required this.total});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.go('/cart'),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$count article${count > 1 ? 's' : ''}',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
-            const Spacer(),
-            const Text('Voir le panier',
-                style: TextStyle(
-                    color: Colors.white,
+    return Container(
+      height: 64,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => context.go('/cart'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                // Label + count badge
+                Text(
+                  'VOTRE COMMANDE',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    fontSize: 15)),
-            const Spacer(),
-            Text(
-              total.toFcfa(),
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15),
+                    color: AppColors.onSurface,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryVibrant,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$count',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Total
+                Text(
+                  total.toFcfa(),
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                // CTA button
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Text(
+                    'Voir le Panier',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
+
+// ─── Loading view ────────────────────────────────────────────────────────
 
 class _LoadingView extends StatelessWidget {
   const _LoadingView();
