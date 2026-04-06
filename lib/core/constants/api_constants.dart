@@ -1,15 +1,8 @@
-import 'dart:io';
-
 class ApiConstants {
   ApiConstants._();
 
-  // Base URL selon plateforme
-  static String get baseUrl {
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:3000/api/v1'; // Android emulator → localhost
-    }
-    return 'http://localhost:3000/api/v1'; // iOS simulator
-  }
+  // Base URL production
+  static const String baseUrl = 'https://nyama-api-production.up.railway.app/api/v1';
 
   // Timeouts
   static const Duration connectTimeout = Duration(seconds: 10);
@@ -51,12 +44,7 @@ class ApiConstants {
   static const String verifyPayment = '/payments/verify';
 
   // WebSocket
-  static String get wsUrl {
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:3000';
-    }
-    return 'http://localhost:3000';
-  }
+  static const String wsUrl = 'https://nyama-api-production.up.railway.app';
 
   // Storage keys
   static const String accessTokenKey = 'access_token';
