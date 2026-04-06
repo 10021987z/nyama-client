@@ -54,9 +54,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   void _navigate(AuthStatus status) {
     if (!mounted) return;
-    if (status == AuthStatus.authenticated) {
-      context.go('/home');
-    } else if (status == AuthStatus.initial) {
+    if (status == AuthStatus.initial) {
       // checkAuth pas encore terminé : écoute le prochain changement
       Future.delayed(const Duration(milliseconds: 300), () {
         if (!mounted) return;
@@ -64,7 +62,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         _navigate(next == AuthStatus.initial ? AuthStatus.unauthenticated : next);
       });
     } else {
-      context.go('/onboarding');
+      // Authentifié ou non → affiche la page d'accueil (endpoints publics)
+      context.go('/home');
     }
   }
 

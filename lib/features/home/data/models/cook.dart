@@ -51,10 +51,9 @@ class Cook {
   /// Retourne les horaires du jour actuel (null si non défini)
   DayHours? get todayHours {
     const dayKeys = [
-      'sunday', 'monday', 'tuesday', 'wednesday',
-      'thursday', 'friday', 'saturday'
+      'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
     ];
-    final todayKey = dayKeys[DateTime.now().weekday % 7];
+    final todayKey = dayKeys[DateTime.now().weekday - 1];
     return openingHours[todayKey];
   }
 

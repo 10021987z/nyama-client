@@ -173,35 +173,26 @@ class _OfflineInterceptor extends Interceptor {
   }
 }
 
-/// Intercepteur de logs (désactivé en production)
+/// Intercepteur de logs (actif en debug ET release pour diagnostic)
 class _LogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    assert(() {
-      // ignore: avoid_print
-      print('[API] ${options.method} ${options.path}');
-      return true;
-    }());
+    // ignore: avoid_print
+    print('[API REQUEST] ${options.method} ${options.baseUrl}${options.path}');
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    assert(() {
-      // ignore: avoid_print
-      print('[API] ${response.statusCode} ${response.requestOptions.path}');
-      return true;
-    }());
+    // ignore: avoid_print
+    print('[API RESPONSE] ${response.statusCode} ${response.requestOptions.path} — ${response.data.toString().length} chars');
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    assert(() {
-      // ignore: avoid_print
-      print('[API] ERROR ${err.response?.statusCode} ${err.requestOptions.path}: ${err.message}');
-      return true;
-    }());
+    // ignore: avoid_print
+    print('[API ERROR] ${err.type} ${err.response?.statusCode} ${err.requestOptions.path}: ${err.message}');
     handler.next(ApiExceptionHandler.handle(err) as DioException? ?? err);
   }
 }
