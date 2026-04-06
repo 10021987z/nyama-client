@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
@@ -118,12 +117,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         focusNode: _focus,
                         autofocus: true,
                         onChanged: _onChanged,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                             fontSize: 15, color: AppColors.onSurface),
                         cursorColor: AppColors.primaryVibrant,
                         decoration: InputDecoration(
                           hintText: 'Plat, cuisinière, spécialité...',
-                          hintStyle: GoogleFonts.inter(
+                          hintStyle: TextStyle(fontFamily: 'NunitoSans',
                               fontSize: 15, color: AppColors.textTertiary),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -210,7 +209,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             Text(
               'Aucun résultat pour "$_query"',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'NunitoSans',
                   fontSize: 16, color: AppColors.textSecondary),
             ),
           ],
@@ -247,7 +246,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           // ── Recherches Récentes ──────────────────────────────────
           Text(
             'Recherches Récentes',
-            style: GoogleFonts.newsreader(
+            style: TextStyle(fontFamily: 'Montserrat',
               fontSize: 20,
               fontWeight: FontWeight.w700,
               fontStyle: FontStyle.italic,
@@ -273,7 +272,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ),
                   child: Text(
                     search,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: AppColors.onSurface),
@@ -291,7 +290,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             children: [
               Text(
                 'Explorer les Régions',
-                style: GoogleFonts.newsreader(
+                style: TextStyle(fontFamily: 'Montserrat',
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   fontStyle: FontStyle.italic,
@@ -300,7 +299,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
               Text(
                 'Voir la Carte',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'NunitoSans',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryVibrant,
@@ -332,7 +331,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           // ── Catégories ───────────────────────────────────────────
           Text(
             'Catégories',
-            style: GoogleFonts.newsreader(
+            style: TextStyle(fontFamily: 'Montserrat',
               fontSize: 20,
               fontWeight: FontWeight.w700,
               fontStyle: FontStyle.italic,
@@ -376,7 +375,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           // ── Meilleurs Choix à Proximité ──────────────────────────
           Text(
             'Meilleurs Choix à Proximité',
-            style: GoogleFonts.newsreader(
+            style: TextStyle(fontFamily: 'Montserrat',
               fontSize: 20,
               fontWeight: FontWeight.w700,
               fontStyle: FontStyle.italic,
@@ -408,7 +407,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                     child: Text(
                       filter,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: isActive
@@ -500,7 +499,7 @@ class _RegionCard extends StatelessWidget {
             bottom: 14,
             child: Text(
               label,
-              style: GoogleFonts.newsreader(
+              style: TextStyle(fontFamily: 'Montserrat',
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -560,7 +559,7 @@ class _CategoryCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.newsreader(
+                  style: TextStyle(fontFamily: 'Montserrat',
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -569,7 +568,7 @@ class _CategoryCard extends StatelessWidget {
                 if (subtitle.isNotEmpty)
                   Text(
                     subtitle,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 11,
                       color: Colors.white.withValues(alpha: 0.8),
                     ),
@@ -666,7 +665,7 @@ class _NearbyRestaurantCard extends StatelessWidget {
                       const SizedBox(width: 3),
                       Text(
                         rating.toStringAsFixed(1),
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -690,7 +689,7 @@ class _NearbyRestaurantCard extends StatelessWidget {
                     ),
                     child: Text(
                       'LIVRAISON GRATUITE',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -713,7 +712,7 @@ class _NearbyRestaurantCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         name,
-                        style: GoogleFonts.newsreader(
+                        style: TextStyle(fontFamily: 'Montserrat',
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: AppColors.onSurface,
@@ -737,7 +736,7 @@ class _NearbyRestaurantCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -752,7 +751,7 @@ class _NearbyRestaurantCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       deliveryTime,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -763,7 +762,7 @@ class _NearbyRestaurantCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       priceRange,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -851,16 +850,17 @@ class _MenuResultTile extends StatelessWidget {
       title: Text(item.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+          style: TextStyle(fontFamily: 'NunitoSans',fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(
         item.cook?.displayName ?? '',
         style:
-            GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12),
+            TextStyle(fontFamily: 'NunitoSans',color: AppColors.textSecondary, fontSize: 12),
       ),
       trailing: Text(
         item.priceXaf.toFcfa(),
-        style: GoogleFonts.inter(
-            color: AppColors.primaryVibrant,
+        style: const TextStyle(
+            fontFamily: 'SpaceMono',
+            color: AppColors.gold,
             fontWeight: FontWeight.w700,
             fontSize: 13),
       ),
@@ -887,7 +887,7 @@ class _CookResultTile extends StatelessWidget {
         backgroundColor: AppColors.primaryLight,
         child: Text(
           cook.displayName.isNotEmpty ? cook.displayName[0].toUpperCase() : '?',
-          style: GoogleFonts.newsreader(
+          style: TextStyle(fontFamily: 'Montserrat',
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppColors.primary,
@@ -897,13 +897,13 @@ class _CookResultTile extends StatelessWidget {
       title: Text(cook.displayName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+          style: TextStyle(fontFamily: 'NunitoSans',fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(
         cook.specialty.take(2).join(' · '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style:
-            GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12),
+            TextStyle(fontFamily: 'NunitoSans',color: AppColors.textSecondary, fontSize: 12),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -914,7 +914,7 @@ class _CookResultTile extends StatelessWidget {
           Text(
             cook.avgRating.toStringAsFixed(1),
             style:
-                GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+                TextStyle(fontFamily: 'NunitoSans',fontWeight: FontWeight.w600, fontSize: 13),
           ),
         ],
       ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
@@ -158,12 +157,12 @@ class _CookDetailViewState extends State<_CookDetailView>
                       unselectedLabelColor: AppColors.textSecondary,
                       indicatorColor: AppColors.primaryVibrant,
                       indicatorWeight: 3,
-                      labelStyle: GoogleFonts.newsreader(
+                      labelStyle: TextStyle(fontFamily: 'Montserrat',
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         fontStyle: FontStyle.italic,
                       ),
-                      unselectedLabelStyle: GoogleFonts.inter(
+                      unselectedLabelStyle: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -258,8 +257,8 @@ class _CookDetailViewState extends State<_CookDetailView>
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Panier différent',
-            style: GoogleFonts.newsreader(fontWeight: FontWeight.w700)),
-        content: Text(e.message, style: GoogleFonts.inter(fontSize: 14)),
+            style: TextStyle(fontFamily: 'Montserrat',fontWeight: FontWeight.w700)),
+        content: Text(e.message, style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -300,7 +299,7 @@ class _HeroHeader extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF5C3400), Color(0xFF884D00)],
+              colors: [Color(0xFFE06A10), Color(0xFFF57C20)],
             ),
           ),
           child: const Center(
@@ -353,7 +352,7 @@ class _HeroHeader extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           cook.avgRating.toStringAsFixed(1),
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                             color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -379,7 +378,7 @@ class _HeroHeader extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           '25-35 min',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -399,7 +398,7 @@ class _HeroHeader extends StatelessWidget {
                     ),
                     child: Text(
                       cook.isOpenNow ? 'Ouvert' : 'Fermé',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -413,7 +412,7 @@ class _HeroHeader extends StatelessWidget {
               // Restaurant name
               Text(
                 cook.displayName,
-                style: GoogleFonts.newsreader(
+                style: TextStyle(fontFamily: 'Montserrat',
                   color: Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
@@ -428,7 +427,7 @@ class _HeroHeader extends StatelessWidget {
               if (cook.specialty.isNotEmpty)
                 Text(
                   cook.specialty.take(3).join(' · '),
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     color: Colors.white70,
                     fontSize: 14,
                   ),
@@ -443,7 +442,7 @@ class _HeroHeader extends StatelessWidget {
                 children: [
                   Text(
                     '${cook.totalOrders} commandes',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                         color: Colors.white60, fontSize: 12),
                   ),
                   if (cook.landmark != null) ...[
@@ -454,7 +453,7 @@ class _HeroHeader extends StatelessWidget {
                     Flexible(
                       child: Text(
                         cook.landmark!,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                             color: Colors.white60, fontSize: 12),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -514,7 +513,7 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.newsreader(
+            style: TextStyle(fontFamily: 'Montserrat',
               fontSize: 22,
               fontWeight: FontWeight.w700,
               fontStyle: FontStyle.italic,
@@ -524,7 +523,7 @@ class _SectionHeader extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'NunitoSans',
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
@@ -586,7 +585,7 @@ class _VibrantMenuCard extends StatelessWidget {
                     children: [
                       Text(
                         item.name,
-                        style: GoogleFonts.newsreader(
+                        style: TextStyle(fontFamily: 'Montserrat',
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: AppColors.onSurface,
@@ -598,7 +597,7 @@ class _VibrantMenuCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           item.description!,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                             fontSize: 13,
                             color: AppColors.textSecondary,
                             height: 1.3,
@@ -615,10 +614,11 @@ class _VibrantMenuCard extends StatelessWidget {
                     children: [
                       Text(
                         item.priceXaf.toFcfa(),
-                        style: GoogleFonts.inter(
+                        style: const TextStyle(
+                          fontFamily: 'SpaceMono',
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primaryVibrant,
+                          color: AppColors.gold,
                         ),
                       ),
                       const Spacer(),
@@ -632,7 +632,7 @@ class _VibrantMenuCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text('Épuisé',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'NunitoSans',
                                 fontSize: 11,
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w600,
@@ -669,7 +669,7 @@ class _VibrantMenuCard extends StatelessWidget {
                               child: Text(
                                 '$quantity',
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'NunitoSans',
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
                                 ),
@@ -793,7 +793,7 @@ class _StickyCartBar extends StatelessWidget {
                 // Label + count badge
                 Text(
                   'VOTRE COMMANDE',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppColors.onSurface,
@@ -811,7 +811,7 @@ class _StickyCartBar extends StatelessWidget {
                   child: Center(
                     child: Text(
                       '$count',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -825,7 +825,7 @@ class _StickyCartBar extends StatelessWidget {
                 // Total
                 Text(
                   total.toFcfa(),
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                     color: AppColors.onSurface,
@@ -844,7 +844,7 @@ class _StickyCartBar extends StatelessWidget {
                   ),
                   child: Text(
                     'Voir le Panier',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

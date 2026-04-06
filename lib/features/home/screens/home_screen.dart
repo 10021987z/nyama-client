@@ -46,7 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.primaryVibrant,
             duration: const Duration(seconds: 4),
           ),
         );
@@ -74,7 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       body: Column(
         children: [
           // ── Bannière hors-ligne ───────────────────────────────────────

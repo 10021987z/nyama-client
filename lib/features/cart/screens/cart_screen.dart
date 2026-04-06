@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../core/utils/validators.dart' show Validators;
@@ -47,12 +46,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        title: Text(
-          'The Modern Griot',
-          style: GoogleFonts.newsreader(
+        title: const Text(
+          'NYAMA',
+          style: TextStyle(
+            fontFamily: 'Montserrat',
             fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.terracotta,
+            fontWeight: FontWeight.w900,
+            color: AppColors.primary,
+            letterSpacing: 2,
           ),
         ),
         leading: IconButton(
@@ -67,7 +68,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               backgroundColor: AppColors.primaryLight,
               child: Text(
                 'U',
-                style: GoogleFonts.newsreader(
+                style: TextStyle(fontFamily: 'Montserrat',
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,
@@ -91,7 +92,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         // ── Title ─────────────────────────────────────────
                         Text(
                           'Paiement',
-                          style: GoogleFonts.newsreader(
+                          style: TextStyle(fontFamily: 'Montserrat',
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
                             color: AppColors.onSurface,
@@ -100,7 +101,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Consultez votre sélection pour Savor Cameroon.',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                             fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
@@ -136,14 +137,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   children: [
                                     TextField(
                                       controller: _addressController,
-                                      style: GoogleFonts.inter(
+                                      style: TextStyle(fontFamily: 'NunitoSans',
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.onSurface,
                                       ),
                                       decoration: InputDecoration(
                                         hintText: 'Akwa, rue de la joie',
-                                        hintStyle: GoogleFonts.inter(
+                                        hintStyle: TextStyle(fontFamily: 'NunitoSans',
                                           fontSize: 14,
                                           color: AppColors.textTertiary,
                                         ),
@@ -172,7 +173,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   ),
                                   child: Text(
                                     'MODIFIER',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(fontFamily: 'NunitoSans',
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.primaryVibrant,
@@ -254,11 +255,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           child: TextField(
                             controller: _noteController,
                             maxLines: 2,
-                            style: GoogleFonts.inter(fontSize: 14),
+                            style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14),
                             decoration: InputDecoration(
                               hintText:
                                   'Ex : Pas trop épicé, sans oignons...',
-                              hintStyle: GoogleFonts.inter(
+                              hintStyle: TextStyle(fontFamily: 'NunitoSans',
                                   fontSize: 14,
                                   color: AppColors.textTertiary),
                               border: InputBorder.none,
@@ -413,7 +414,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: GoogleFonts.newsreader(
+      style: TextStyle(fontFamily: 'Montserrat',
         fontSize: 20,
         fontWeight: FontWeight.w700,
         fontStyle: FontStyle.italic,
@@ -472,7 +473,7 @@ class _VibrantCartItem extends StatelessWidget {
                   item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.newsreader(
+                  style: TextStyle(fontFamily: 'Montserrat',
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.onSurface,
@@ -481,7 +482,7 @@ class _VibrantCartItem extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   item.cookName,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -496,7 +497,7 @@ class _VibrantCartItem extends StatelessWidget {
                   ),
                   child: Text(
                     'ÉPICES SIGNATURE',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                       color: AppColors.tertiary,
@@ -513,10 +514,11 @@ class _VibrantCartItem extends StatelessWidget {
             children: [
               Text(
                 (item.priceXaf * item.quantity).toFcfa(),
-                style: GoogleFonts.inter(
+                style: const TextStyle(
+                  fontFamily: 'SpaceMono',
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primaryVibrant,
+                  color: AppColors.gold,
                 ),
               ),
               const SizedBox(height: 4),
@@ -530,7 +532,7 @@ class _VibrantCartItem extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
                       'Qté : ${item.quantity}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
@@ -611,7 +613,7 @@ class _DeliverySpeedChip extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'NunitoSans',
               fontSize: 13,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
               color: isActive
@@ -699,7 +701,7 @@ class _VibrantPaymentSelectorState extends State<_VibrantPaymentSelector> {
               child: TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                style: GoogleFonts.inter(fontSize: 14),
+                style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14),
                 onChanged: (v) {
                   final normalized = Validators.normalizePhone(v);
                   widget.onPhoneChanged(normalized);
@@ -715,9 +717,9 @@ class _VibrantPaymentSelectorState extends State<_VibrantPaymentSelector> {
                   labelText:
                       'Numéro ${widget.selected == 'orange_money' ? 'Orange' : 'MTN'} (+237)',
                   hintText: '6XXXXXXXX',
-                  labelStyle: GoogleFonts.inter(
+                  labelStyle: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 13, color: AppColors.textSecondary),
-                  hintStyle: GoogleFonts.inter(
+                  hintStyle: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 14, color: AppColors.textTertiary),
                   prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                   filled: true,
@@ -777,7 +779,7 @@ class _PaymentOption extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'NunitoSans',
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: AppColors.onSurface,
@@ -852,7 +854,7 @@ class _VibrantSummary extends StatelessWidget {
               isFreeDelivery
                   ? Text(
                       'Frais de livraison',
-                      style: GoogleFonts.newsreader(
+                      style: TextStyle(fontFamily: 'Montserrat',
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
                         color: AppColors.terracotta,
@@ -861,14 +863,14 @@ class _VibrantSummary extends StatelessWidget {
                     )
                   : Text(
                       'Frais de livraison',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
                     ),
               Text(
                 isFreeDelivery ? 'Gratuit' : deliveryFee.toFcfa(),
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'NunitoSans',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color:
@@ -891,7 +893,7 @@ class _VibrantSummary extends StatelessWidget {
             children: [
               Text(
                 'Total',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'NunitoSans',
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.onSurface,
@@ -902,15 +904,16 @@ class _VibrantSummary extends StatelessWidget {
                 children: [
                   Text(
                     total.toFcfa(),
-                    style: GoogleFonts.inter(
+                    style: const TextStyle(
+                      fontFamily: 'SpaceMono',
                       fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primaryVibrant,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
                     ),
                   ),
                   Text(
                     'TVA incluse',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 11,
                       color: AppColors.textTertiary,
                     ),
@@ -938,14 +941,14 @@ class _SummaryRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'NunitoSans',
             fontSize: 14,
             color: AppColors.textSecondary,
           ),
         ),
         Text(
           value,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'NunitoSans',
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: AppColors.onSurface,
@@ -1007,7 +1010,7 @@ class _BottomCta extends StatelessWidget {
                     children: [
                       Text(
                         'Commander • ${total.toFcfa()}',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -1041,7 +1044,7 @@ class _EmptyCart extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Votre panier est vide',
-            style: GoogleFonts.newsreader(
+            style: TextStyle(fontFamily: 'Montserrat',
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: AppColors.onSurface,
@@ -1050,7 +1053,7 @@ class _EmptyCart extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Ajoutez des plats depuis l\'accueil',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'NunitoSans',
               fontSize: 14,
               color: AppColors.textSecondary,
             ),

@@ -50,6 +50,11 @@ dependencies:
   # Appel téléphonique direct
   url_launcher: ^6.2.0
 
+  # SVG logo
+  flutter_svg: ^2.0.0
+
+  # NOTE: google_fonts removed — using bundled Montserrat, NunitoSans, SpaceMono
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -64,7 +69,7 @@ flutter_launcher_icons:
   min_sdk_android: 21
 
 flutter_native_splash:
-  color: "#1B4332"
+  color: "#F57C20"
   android: true
   ios: true
 
@@ -73,3 +78,17 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/
+
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Variable.ttf
+    - family: NunitoSans
+      fonts:
+        - asset: assets/fonts/NunitoSans-Variable.ttf
+    - family: SpaceMono
+      fonts:
+        - asset: assets/fonts/SpaceMono-Regular.ttf
+        - asset: assets/fonts/SpaceMono-Bold.ttf
+          weight: 700

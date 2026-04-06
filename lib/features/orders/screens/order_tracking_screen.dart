@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
@@ -102,12 +101,12 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Commande livrée !',
-          style: GoogleFonts.newsreader(
+          style: TextStyle(fontFamily: 'Montserrat',
               fontSize: 22, fontWeight: FontWeight.w700),
         ),
         content: Text(
           'Votre repas a bien été livré. Bon appétit !',
-          style: GoogleFonts.inter(fontSize: 14),
+          style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14),
         ),
         actions: [
           ElevatedButton(
@@ -144,7 +143,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                 CircularProgressIndicator(color: AppColors.primaryVibrant)),
         error: (e, _) => Center(
           child: Text(e.toString(),
-              style: GoogleFonts.inter(color: AppColors.textSecondary)),
+              style: TextStyle(fontFamily: 'NunitoSans',color: AppColors.textSecondary)),
         ),
         data: (order) => _buildContent(order),
       ),
@@ -195,14 +194,14 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                     children: [
                       Text(
                         'Livraison à',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
                       Text(
                         'Douala, Cameroon',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primaryVibrant,
@@ -293,17 +292,17 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                           // ── ETA ───────────────────────────────────
                           Text(
                             'ARRIVÉE DANS',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'NunitoSans',
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.terracotta,
+                              color: AppColors.primary,
                               letterSpacing: 1.5,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '12 min',
-                            style: GoogleFonts.newsreader(
+                            style: TextStyle(fontFamily: 'Montserrat',
                               fontSize: 48,
                               fontWeight: FontWeight.w700,
                               color: AppColors.onSurface,
@@ -315,7 +314,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                             children: [
                               Text(
                                 'Statut',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'NunitoSans',
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
                                 ),
@@ -332,7 +331,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                   currentStatus == OrderStatus.delivering
                                       ? 'En chemin'
                                       : currentStatus.label,
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'NunitoSans',
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -393,7 +392,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                   child: Text(
                                     (order.delivery.riderName ?? 'M')[0]
                                         .toUpperCase(),
-                                    style: GoogleFonts.newsreader(
+                                    style: TextStyle(fontFamily: 'Montserrat',
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.primary,
@@ -409,7 +408,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                       Text(
                                         order.delivery.riderName ??
                                             'Moussa Traoré',
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'NunitoSans',
                                           fontSize: 15,
                                           fontWeight: FontWeight.w700,
                                           color: AppColors.onSurface,
@@ -417,7 +416,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                       ),
                                       Text(
                                         'Coursier Rapide & Fiable',
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'NunitoSans',
                                           fontSize: 12,
                                           color: AppColors.textSecondary,
                                         ),
@@ -442,7 +441,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                             const SizedBox(width: 3),
                                             Text(
                                               '4.9',
-                                              style: GoogleFonts.inter(
+                                              style: TextStyle(fontFamily: 'NunitoSans',
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w700,
                                                 color:
@@ -493,7 +492,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                       Expanded(
                                         child: Text(
                                           'Résumé de la commande #${order.shortId}',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'NunitoSans',
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
                                             color: AppColors.onSurface,
@@ -517,7 +516,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                             children: [
                                               Text(
                                                 '${item.quantity}x',
-                                                style: GoogleFonts.inter(
+                                                style: TextStyle(fontFamily: 'NunitoSans',
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w600,
                                                   color: AppColors
@@ -528,13 +527,13 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                               Expanded(
                                                 child: Text(
                                                   item.name,
-                                                  style: GoogleFonts.inter(
+                                                  style: TextStyle(fontFamily: 'NunitoSans',
                                                       fontSize: 13),
                                                 ),
                                               ),
                                               Text(
                                                 item.subtotal.toFcfa(),
-                                                style: GoogleFonts.inter(
+                                                style: TextStyle(fontFamily: 'NunitoSans',
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w600,
                                                 ),
@@ -549,14 +548,14 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                                       children: [
                                         Text(
                                           'Total',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'NunitoSans',
                                             fontSize: 14,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                         Text(
                                           order.totalXaf.toFcfa(),
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'NunitoSans',
                                             fontSize: 14,
                                             fontWeight: FontWeight.w700,
                                             color: AppColors.primaryVibrant,
@@ -725,7 +724,7 @@ class _TimelineStep extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: isDone || isActive
@@ -736,7 +735,7 @@ class _TimelineStep extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),

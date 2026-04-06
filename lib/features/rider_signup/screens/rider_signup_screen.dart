@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 
 class RiderSignupScreen extends StatefulWidget {
@@ -52,11 +51,11 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                       ),
                       const Spacer(),
                       Text(
-                        'Savor Cameroon',
-                        style: GoogleFonts.newsreader(
+                        'NYAMA',
+                        style: TextStyle(fontFamily: 'Montserrat',
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.terracotta,
+                          color: AppColors.primary,
                         ),
                       ),
                       const Spacer(),
@@ -73,7 +72,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                     ),
                     child: Text(
                       'DEVENIR PARTENAIRE LIVREUR',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'NunitoSans',
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primaryVibrant,
@@ -95,7 +94,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                   // ── Hero Section ─────────────────────────────────────
                   Text(
                     'Soyez votre propre patron avec Nyama',
-                    style: GoogleFonts.newsreader(
+                    style: TextStyle(fontFamily: 'Montserrat',
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
                       color: AppColors.onSurface,
@@ -105,7 +104,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                   const SizedBox(height: 12),
                   Text(
                     'Rejoignez notre réseau de livreurs et gagnez de l\'argent à votre rythme. Livrez des repas savoureux et faites la différence dans votre communauté.',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'NunitoSans',
                       fontSize: 14,
                       color: AppColors.textSecondary,
                       height: 1.5,
@@ -130,7 +129,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                       child: Center(
                         child: Text(
                           'Commencer maintenant',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
@@ -152,7 +151,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                       ),
                       child: Text(
                         'Plus de 500 livreurs actifs',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'NunitoSans',
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: AppColors.textSecondary,
@@ -185,7 +184,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                         const SizedBox(width: 12),
                         Text(
                           '150,000 FCFA / mois',
-                          style: GoogleFonts.newsreader(
+                          style: TextStyle(fontFamily: 'Montserrat',
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
                             color: AppColors.success,
@@ -199,8 +198,8 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
 
                   // ── Why Choose Section ───────────────────────────────
                   Text(
-                    'Pourquoi choisir Savor Cameroon ?',
-                    style: GoogleFonts.newsreader(
+                    'Pourquoi choisir NYAMA ?',
+                    style: TextStyle(fontFamily: 'Montserrat',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       fontStyle: FontStyle.italic,
@@ -237,7 +236,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                     ),
                     child: Text(
                       '"C\'est le deal quand vous avez besoin, c\'est votre solution de réussite."',
-                      style: GoogleFonts.newsreader(
+                      style: TextStyle(fontFamily: 'Montserrat',
                         fontSize: 16,
                         fontStyle: FontStyle.italic,
                         color: AppColors.primary,
@@ -251,7 +250,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                   // ── Requirements Section ─────────────────────────────
                   Text(
                     'Ce qu\'il vous faut pour commencer',
-                    style: GoogleFonts.newsreader(
+                    style: TextStyle(fontFamily: 'Montserrat',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       fontStyle: FontStyle.italic,
@@ -284,7 +283,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                   // ── Signup Form ──────────────────────────────────────
                   Text(
                     'Inscrivez-vous en 2 minutes',
-                    style: GoogleFonts.newsreader(
+                    style: TextStyle(fontFamily: 'Montserrat',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       fontStyle: FontStyle.italic,
@@ -300,10 +299,10 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                         // Name
                         TextFormField(
                           controller: _nameController,
-                          style: GoogleFonts.inter(fontSize: 14),
+                          style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'Nom complet',
-                            labelStyle: GoogleFonts.inter(
+                            labelStyle: TextStyle(fontFamily: 'NunitoSans',
                                 fontSize: 14,
                                 color: AppColors.textSecondary),
                             prefixIcon: const Icon(
@@ -320,14 +319,14 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                         TextFormField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
-                          style: GoogleFonts.inter(fontSize: 14),
+                          style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'Numéro de téléphone',
-                            labelStyle: GoogleFonts.inter(
+                            labelStyle: TextStyle(fontFamily: 'NunitoSans',
                                 fontSize: 14,
                                 color: AppColors.textSecondary),
                             hintText: '+237 6XX XXX XXX',
-                            hintStyle: GoogleFonts.inter(
+                            hintStyle: TextStyle(fontFamily: 'NunitoSans',
                                 fontSize: 14,
                                 color: AppColors.textTertiary),
                             prefixIcon: const Icon(
@@ -343,11 +342,11 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                         // Vehicle Type
                         DropdownButtonFormField<String>(
                           initialValue: _vehicleType,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                               fontSize: 14, color: AppColors.onSurface),
                           decoration: InputDecoration(
                             labelText: 'Type de véhicule',
-                            labelStyle: GoogleFonts.inter(
+                            labelStyle: TextStyle(fontFamily: 'NunitoSans',
                                 fontSize: 14,
                                 color: AppColors.textSecondary),
                             prefixIcon: const Icon(
@@ -395,8 +394,8 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                 onTap: () => setState(
                                     () => _acceptCgu = !_acceptCgu),
                                 child: Text(
-                                  'J\'accepte les Conditions Générales d\'Utilisation et la Politique de Confidentialité de Savor Cameroon.',
-                                  style: GoogleFonts.inter(
+                                  'J\'accepte les Conditions Générales d\'Utilisation et la Politique de Confidentialité de NYAMA.',
+                                  style: TextStyle(fontFamily: 'NunitoSans',
                                     fontSize: 13,
                                     color: AppColors.textSecondary,
                                     height: 1.4,
@@ -440,7 +439,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                                       children: [
                                         Text(
                                           'Envoyer ma candidature',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'NunitoSans',
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
                                             color: Colors.white,
@@ -467,17 +466,17 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'Savor Cameroon',
-                          style: GoogleFonts.newsreader(
+                          'NYAMA',
+                          style: TextStyle(fontFamily: 'Montserrat',
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.terracotta,
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Delivering Tradition & Craft',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'NunitoSans',
                             fontSize: 13,
                             fontStyle: FontStyle.italic,
                             color: AppColors.textSecondary,
@@ -523,7 +522,7 @@ class _RiderSignupScreenState extends State<RiderSignupScreen> {
       SnackBar(
         content: Text(
           'Candidature envoyée ! Nous vous contacterons bientôt.',
-          style: GoogleFonts.inter(fontSize: 14, color: Colors.white),
+          style: TextStyle(fontFamily: 'NunitoSans',fontSize: 14, color: Colors.white),
         ),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
@@ -569,7 +568,7 @@ class _FeatureRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.onSurface,
@@ -578,7 +577,7 @@ class _FeatureRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -622,7 +621,7 @@ class _RequirementStep extends StatelessWidget {
             child: Center(
               child: Text(
                 number,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'NunitoSans',
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -637,7 +636,7 @@ class _RequirementStep extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.onSurface,
@@ -646,7 +645,7 @@ class _RequirementStep extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'NunitoSans',
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -671,7 +670,7 @@ class _FooterLink extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: GoogleFonts.inter(
+      style: TextStyle(fontFamily: 'NunitoSans',
         fontSize: 13,
         color: AppColors.primaryVibrant,
         fontWeight: FontWeight.w500,
@@ -687,7 +686,7 @@ class _FooterDot extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Text(
         '·',
-        style: GoogleFonts.inter(
+        style: TextStyle(fontFamily: 'NunitoSans',
           fontSize: 13,
           color: AppColors.textTertiary,
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
@@ -100,40 +101,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo : icône plat + NYAMA
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text('🍽️', style: TextStyle(fontSize: 44)),
+              // Logo SVG NYAMA
+              SvgPicture.asset(
+                'assets/nyama-logo.svg',
+                width: 180,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'NYAMA',
-                style: TextStyle(
-                  fontSize: 38,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 6,
-                ),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               const Text(
                 'La cuisine camerounaise,\nlivrée chez vous',
                 textAlign: TextAlign.center,
                 style: TextStyle(
+                  fontFamily: 'NunitoSans',
                   fontSize: 15,
                   color: Colors.white70,
                   height: 1.5,
@@ -141,13 +123,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 ),
               ),
               const SizedBox(height: 64),
-              // Indicateur de chargement discret
-              SizedBox(
+              const SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppColors.gold,
                 ),
               ),
             ],
