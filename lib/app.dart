@@ -10,6 +10,7 @@ import 'features/home/screens/home_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
 import 'features/orders/screens/order_tracking_screen.dart';
+import 'features/payment/data/checkout_data.dart';
 import 'features/payment/screens/payment_screen.dart';
 import 'features/rating/screens/rating_screen.dart';
 import 'features/rider_signup/screens/rider_signup_screen.dart';
@@ -94,7 +95,13 @@ class App extends StatelessWidget {
       ),
 
       // ── Paiement & notation ───────────────────────────────────────────
-      GoRoute(path: '/payment', builder: (c, s) => const PaymentScreen()),
+      GoRoute(
+        path: '/payment',
+        builder: (c, s) {
+          final data = s.extra is CheckoutData ? s.extra as CheckoutData : null;
+          return PaymentScreen(checkout: data);
+        },
+      ),
       GoRoute(
         path: '/rating/:orderId',
         builder: (c, s) =>
