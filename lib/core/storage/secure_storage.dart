@@ -47,6 +47,18 @@ class SecureStorage {
     return _storage.read(key: ApiConstants.userIdKey);
   }
 
+  // Quartier choisi (Phase 2 onboarding)
+  static const _kQuartier = 'user_quartier';
+  static const _kCity = 'user_city';
+
+  static Future<void> saveQuartier(String city, String quartier) async {
+    await _storage.write(key: _kCity, value: city);
+    await _storage.write(key: _kQuartier, value: quartier);
+  }
+
+  static Future<String?> getQuartier() => _storage.read(key: _kQuartier);
+  static Future<String?> getCity() => _storage.read(key: _kCity);
+
   // Vérifie si l'utilisateur est connecté
   static Future<bool> isLoggedIn() async {
     final token = await getAccessToken();

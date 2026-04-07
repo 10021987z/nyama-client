@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -14,122 +16,180 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _animController;
-  late final Animation<double> _fadeAnim;
-  late final Animation<double> _slideAnim;
+  late final AnimationController _bell;
+  late final Animation<double> _translateY;
+  late final Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-
-    _animController = AnimationController(
+    _bell = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
     );
+    _translateY = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -8.0), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: -8.0, end: 0.0), weight: 50),
+    ]).animate(CurvedAnimation(parent: _bell, curve: Curves.easeOut));
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.05), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.05, end: 1.0), weight: 50),
+    ]).animate(CurvedAnimation(parent: _bell, curve: Curves.easeOut));
+    _bell.forward();
 
-    _fadeAnim = CurvedAnimation(
-      parent: _animController,
-      curve: const Interval(0.0, 0.7, curve: Curves.easeIn),
-    );
-
-    _slideAnim = Tween<double>(begin: 24, end: 0).animate(
-      CurvedAnimation(
-        parent: _animController,
-        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
-      ),
-    );
-
-    _animController.forward();
-    _scheduleNavigation();
+    Future.delayed(const Duration(milliseconds: 2500), _decideRoute);
   }
 
-  void _scheduleNavigation() {
-    // Attend minimum 2s pour l'effet splash + que checkAuth() se termine
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      final status = ref.read(authStateProvider).status;
-      _navigate(status);
-    });
-  }
-
-  void _navigate(AuthStatus status) {
+  void _decideRoute() {
     if (!mounted) return;
-    if (status == AuthStatus.initial) {
-      // checkAuth pas encore terminé : écoute le prochain changement
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (!mounted) return;
-        final next = ref.read(authStateProvider).status;
-        _navigate(next == AuthStatus.initial ? AuthStatus.unauthenticated : next);
-      });
-    } else {
-      // Authentifié ou non → affiche la page d'accueil (endpoints publics)
+    final status = ref.read(authStateProvider).status;
+    if (status == AuthStatus.authenticated) {
       context.go('/home');
+    } else {
+      context.go('/onboarding/phone');
     }
   }
 
   @override
   void dispose() {
-    _animController.dispose();
+    _bell.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Écoute les changements d'état pour naviguer si checkAuth finit tôt
-    ref.listen<AuthState>(authStateProvider, (prev, next) {
-      if (prev?.status == AuthStatus.initial &&
-          next.status != AuthStatus.initial) {
-        _navigate(next.status);
-      }
-    });
-
-    return Scaffold(
-      backgroundColor: AppColors.primary,
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _animController,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _fadeAnim.value,
-              child: Transform.translate(
-                offset: Offset(0, _slideAnim.value),
-                child: child,
-              ),
-            );
-          },
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.primary,
+        body: SafeArea(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo SVG NYAMA
-              SvgPicture.asset(
-                'assets/nyama-logo.svg',
-                width: 180,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
-                  BlendMode.srcIn,
+              const Spacer(flex: 3),
+              // ── Carte logo inclinée ────────────────────────────────────
+              Transform.rotate(
+                angle: 3 * 3.1415926 / 180,
+                child: AnimatedBuilder(
+                  animation: _bell,
+                  builder: (_, child) => Transform.translate(
+                    offset: Offset(0, _translateY.value),
+                    child: Transform.scale(scale: _scale.value, child: child),
+                  ),
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(40),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 30,
+                          offset: const Offset(0, 14),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: SvgPicture.asset(
+                            'assets/nyama-logo.svg',
+                            width: 130,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.black,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 14,
+                          right: 14,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.20),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.black.withValues(alpha: 0.06),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.restaurant,
+                              size: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
               const Text(
-                'La cuisine camerounaise,\nlivrée chez vous',
-                textAlign: TextAlign.center,
+                'NYAMA',
                 style: TextStyle(
-                  fontFamily: 'NunitoSans',
-                  fontSize: 15,
-                  color: Colors.white70,
-                  height: 1.5,
-                  letterSpacing: 0.3,
+                  fontFamily: AppTheme.headlineFamily,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w900,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: -1.5,
+                  color: Colors.white,
+                  height: 1.0,
                 ),
               ),
-              const SizedBox(height: 64),
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.gold,
+              const SizedBox(height: 8),
+              Text(
+                'L\'EXCELLENCE CULINAIRE',
+                style: TextStyle(
+                  fontSize: 14,
+                  letterSpacing: 4.2, // ≈ 0.3em
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
+              const Spacer(flex: 3),
+              // ── 3 dots ────────────────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(3, (i) {
+                  final active = i == 0;
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: active
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.5),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.location_on,
+                      size: 14, color: Colors.white.withValues(alpha: 0.8)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'DOUALA • YAOUNDÉ • KRIBI',
+                    style: TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
