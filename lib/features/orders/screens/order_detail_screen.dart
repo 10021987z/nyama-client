@@ -20,7 +20,11 @@ class OrderDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Commande #${orderId.substring(0, 8).toUpperCase()}')),
+      appBar: AppBar(
+        title: Text(
+          'Commande #${orderId.substring(0, orderId.length < 8 ? orderId.length : 8).toUpperCase()}',
+        ),
+      ),
       body: asyncOrder.when(
         loading: () =>
             const Center(child: CircularProgressIndicator(color: AppColors.primary)),

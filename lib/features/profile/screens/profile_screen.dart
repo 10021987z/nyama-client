@@ -15,9 +15,9 @@ class ProfileScreen extends ConsumerWidget {
     final user = ref.watch(authStateProvider).user;
     final name = user?.name ?? 'Arthur Kamga';
 
-    return Scaffold(
-      backgroundColor: AppColors.creme,
-      body: SafeArea(
+    return ColoredBox(
+      color: AppColors.creme,
+      child: SafeArea(
         child: Column(
           children: [
             _buildHeader(context, name),
@@ -49,7 +49,6 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            _buildBottomNav(context),
           ],
         ),
       ),
@@ -448,67 +447,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context) {
-    Widget item(IconData icon, String label, {bool active = false, VoidCallback? onTap}) {
-      return Expanded(
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon,
-                    size: 22,
-                    color: active
-                        ? AppColors.primary
-                        : AppColors.textTertiary),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    color: active
-                        ? AppColors.primary
-                        : AppColors.textTertiary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceWhite,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.charcoal.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            item(Icons.explore_outlined, 'DISCOVER',
-                onTap: () => context.go('/home')),
-            item(Icons.receipt_long, 'ORDERS',
-                onTap: () => context.go('/orders')),
-            item(Icons.person_rounded, 'PROFILE', active: true),
-            item(Icons.help_outline, 'HELP'),
           ],
         ),
       ),

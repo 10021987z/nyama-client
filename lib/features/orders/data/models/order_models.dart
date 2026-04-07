@@ -232,7 +232,11 @@ class OrderModel {
     return OrderModel(
       id: json['id'] as String? ?? '',
       shortId: json['shortId'] as String? ??
-          (json['id'] as String? ?? '').substring(0, 8).toUpperCase(),
+          (() {
+            final raw = (json['id'] as String? ?? '');
+            final end = raw.length < 8 ? raw.length : 8;
+            return raw.substring(0, end).toUpperCase();
+          })(),
       status: OrderStatus.fromString(json['status'] as String?),
       cookId: json['cookId'] as String? ?? '',
       cookName: json['cookName'] as String? ?? '',

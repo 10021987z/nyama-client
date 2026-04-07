@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -52,6 +53,48 @@ const _mockCategories = [
   'Poissons',
   'Boissons',
 ];
+
+// ─── Placeholder helpers ───────────────────────────────────────────────────
+class _DishPlaceholder extends StatelessWidget {
+  final double? radius;
+  const _DishPlaceholder({this.radius});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF57C20), Color(0xFF994700)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: radius != null ? BorderRadius.circular(radius!) : null,
+      ),
+      child: const Center(
+        child: Icon(Icons.restaurant, color: Colors.white, size: 48),
+      ),
+    );
+  }
+}
+
+/// Network image with cached loading + colored gradient fallback.
+class _DishImage extends StatelessWidget {
+  final String? url;
+  final double? radius;
+  const _DishImage({required this.url, this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) {
+      return _DishPlaceholder(radius: radius);
+    }
+    return CachedNetworkImage(
+      imageUrl: url!,
+      fit: BoxFit.cover,
+      placeholder: (_, _) => Container(color: _kCreme),
+      errorWidget: (_, _, _) => _DishPlaceholder(radius: radius),
+    );
+  }
+}
 
 class _MockDish {
   final String name;
@@ -154,15 +197,15 @@ class _Header extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(16, top + 8, 16, 12),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  image: DecorationImage(
-                    fit: BoxFit.cover,
-                    image: NetworkImage(
-                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop'),
+              const CircleAvatar(
+                radius: 20,
+                backgroundColor: _kOrange,
+                child: Text(
+                  'A',
+                  style: TextStyle(
+                    color: _kWhite,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
                   ),
                 ),
               ),
@@ -286,11 +329,7 @@ class _DailyBanner extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.network(
-                'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=600&h=400&fit=crop',
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(color: _kCharcoal),
-              ),
+              const _DishPlaceholder(),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -530,15 +569,10 @@ class _RestaurantCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Image.network(
-                  img,
+                child: SizedBox(
                   height: 144,
                   width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    height: 144,
-                    color: _kCreme,
-                  ),
+                  child: _DishImage(url: img),
                 ),
               ),
               Positioned(
@@ -739,11 +773,7 @@ class _DishCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Image.network(
-                    img,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(color: _kCreme),
-                  ),
+                  child: _DishImage(url: img, radius: 14),
                 ),
                 Positioned(
                   right: 6,
