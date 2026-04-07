@@ -1,8 +1,8 @@
 import 'dart:ui';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../cart/providers/cart_provider.dart';
@@ -10,43 +10,30 @@ import '../data/models/cook.dart';
 import '../data/models/menu_item.dart';
 import '../providers/home_provider.dart';
 
-// ─── Design tokens (Culinary Signature) ────────────────────────────────────
+// ─── Design tokens (Culinary Signature v2) ─────────────────────────────────
 const _kCreme = Color(0xFFF5F5F0);
 const _kWhite = Color(0xFFFFFFFF);
-const _kOrange = Color(0xFFF57C20);
+const _kInk = Color(0xFF1A1C19);
 const _kCharcoal = Color(0xFF3D3D3D);
+const _kMuted = Color(0xFF5F5E5E);
+const _kOrange = Color(0xFFF57C20);
+const _kOrangeDeep = Color(0xFF994700);
 const _kForest = Color(0xFF1B4332);
 const _kRed = Color(0xFFE8413C);
-const _kSecondary = Color(0xFF6B7280);
+const _kSoftBg = Color(0xFFEEEEE9);
 
 const _kCardShadow = [
   BoxShadow(
-    color: Color(0x08000000),
+    color: Color(0x0A000000),
     offset: Offset(0, 4),
     blurRadius: 12,
   ),
 ];
 
-// ─── Mock data (fallback si l'API ne répond pas) ───────────────────────────
-const _mockMenu = <_MockDish>[
-  _MockDish('Ndolé Viande', 2500,
-      'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=300&h=300&fit=crop'),
-  _MockDish('Poisson Braisé', 4000,
-      'https://images.unsplash.com/photo-1534604973900-c43ab4c2e0ab?w=300&h=300&fit=crop'),
-  _MockDish('Beignets Haricot', 1000,
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&h=300&fit=crop'),
-  _MockDish('Salade Mixte', 1500,
-      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300&h=300&fit=crop'),
-];
+const _kHPad = 24.0;
 
-const _mockCooks = <_MockCook>[
-  _MockCook('Chez Mama Ngono', 'Akwa, Douala', 4.8, '25-35 min',
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=300&fit=crop'),
-  _MockCook('La Table de Bonas', 'Bonapriso, Douala', 4.7, '30-40 min',
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&h=300&fit=crop'),
-];
-
-const _mockCategories = [
+// ─── Mock data ─────────────────────────────────────────────────────────────
+const _mockCategories = <String>[
   'Plats traditionnels',
   'Grillades',
   'Beignets',
@@ -54,63 +41,43 @@ const _mockCategories = [
   'Boissons',
 ];
 
-// ─── Placeholder helpers ───────────────────────────────────────────────────
-class _DishPlaceholder extends StatelessWidget {
-  final double? radius;
-  const _DishPlaceholder({this.radius});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF57C20), Color(0xFF994700)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: radius != null ? BorderRadius.circular(radius!) : null,
-      ),
-      child: const Center(
-        child: Icon(Icons.restaurant, color: Colors.white, size: 48),
-      ),
-    );
-  }
-}
-
-/// Network image with cached loading + colored gradient fallback.
-class _DishImage extends StatelessWidget {
-  final String? url;
-  final double? radius;
-  const _DishImage({required this.url, this.radius});
-
-  @override
-  Widget build(BuildContext context) {
-    if (url == null || url!.isEmpty) {
-      return _DishPlaceholder(radius: radius);
-    }
-    return CachedNetworkImage(
-      imageUrl: url!,
-      fit: BoxFit.cover,
-      placeholder: (_, _) => Container(color: _kCreme),
-      errorWidget: (_, _, _) => _DishPlaceholder(radius: radius),
-    );
-  }
-}
-
-class _MockDish {
-  final String name;
-  final int price;
-  final String img;
-  const _MockDish(this.name, this.price, this.img);
-}
-
-class _MockCook {
+class _MockRestaurant {
   final String name;
   final String area;
   final double rating;
   final String eta;
-  final String img;
-  const _MockCook(this.name, this.area, this.rating, this.eta, this.img);
+  final List<Color> gradient;
+  const _MockRestaurant(
+      this.name, this.area, this.rating, this.eta, this.gradient);
 }
+
+const _mockRestaurants = <_MockRestaurant>[
+  _MockRestaurant('Maman Catherine', 'Akwa, Douala', 4.8, '25-35 min',
+      [Color(0xFFF57C20), Color(0xFFD4A017)]),
+  _MockRestaurant('Le Grilladin d\'Akwa', 'Bali, Douala', 4.5, '30-40 min',
+      [Color(0xFF1B4332), Color(0xFF2A9D8F)]),
+];
+
+class _MockDish {
+  final String name;
+  final int price;
+  final List<Color> gradient;
+  const _MockDish(this.name, this.price, this.gradient);
+}
+
+const _mockDishes = <_MockDish>[
+  _MockDish('Ndolé Viande', 2500, [Color(0xFF8B4513), Color(0xFFD2691E)]),
+  _MockDish('Poisson Braisé', 4000, [Color(0xFF2F4F4F), Color(0xFF5F9EA0)]),
+  _MockDish('Beignets Haricot', 1000, [Color(0xFFDAA520), Color(0xFFF4A460)]),
+  _MockDish('Salade Mixte', 1500, [Color(0xFF2E8B57), Color(0xFF66CDAA)]),
+];
+
+const _dishGradients = <List<Color>>[
+  [Color(0xFF8B4513), Color(0xFFD2691E)],
+  [Color(0xFF2F4F4F), Color(0xFF5F9EA0)],
+  [Color(0xFFDAA520), Color(0xFFF4A460)],
+  [Color(0xFF2E8B57), Color(0xFF66CDAA)],
+];
 
 // ─── Screen ────────────────────────────────────────────────────────────────
 class HomeTab extends ConsumerStatefulWidget {
@@ -137,6 +104,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       orElse: () => const <MenuItem>[],
     );
 
+    final topPad = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: _kCreme,
       body: RefreshIndicator(
@@ -149,29 +118,29 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         child: Stack(
           children: [
             ListView(
-              padding: const EdgeInsets.only(top: 88, bottom: 24),
+              padding: EdgeInsets.only(top: topPad + 76, bottom: 32),
               children: [
                 const SizedBox(height: 8),
-                _SearchBar(),
+                const _SearchBar(),
                 const SizedBox(height: 20),
-                _DailyBanner(),
-                const SizedBox(height: 24),
-                _SectionHeader(title: 'Catégories', action: 'Tout voir'),
+                const _DailyBanner(),
+                const SizedBox(height: 28),
+                const _SectionHeader(title: 'Catégories', action: 'Tout voir'),
                 const SizedBox(height: 12),
                 _CategoryChips(
                   active: _activeCategory,
                   onTap: (c) => setState(() => _activeCategory = c),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 const _SectionHeader(title: 'Restaurants près de toi'),
                 const SizedBox(height: 12),
                 _RestaurantsRow(cooks: cooks),
-                const SizedBox(height: 24),
-                _SectionHeader(
-                    title: 'Plats populaires', action: 'Le goût de chez nous'),
-                const SizedBox(height: 12),
-                _PopularGrid(items: menu),
+                const SizedBox(height: 28),
+                const _SectionHeader(
+                    title: 'Plats populaires',
+                    action: 'Le goût de chez nous'),
                 const SizedBox(height: 16),
+                _PopularGrid(items: menu),
               ],
             ),
             const _Header(),
@@ -191,18 +160,24 @@ class _Header extends StatelessWidget {
     final top = MediaQuery.of(context).padding.top;
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
           color: _kCreme.withValues(alpha: 0.7),
-          padding: EdgeInsets.fromLTRB(16, top + 8, 16, 12),
+          padding: EdgeInsets.fromLTRB(_kHPad, top + 12, _kHPad, 12),
           child: Row(
             children: [
-              const CircleAvatar(
-                radius: 20,
-                backgroundColor: _kOrange,
-                child: Text(
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: _kOrange,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Text(
                   'A',
                   style: TextStyle(
+                    fontFamily: 'Montserrat',
                     color: _kWhite,
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
@@ -221,21 +196,20 @@ class _Header extends StatelessWidget {
                         fontFamily: 'Montserrat',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: _kCharcoal,
+                        color: _kInk,
                         height: 1.2,
                       ),
                     ),
                     SizedBox(height: 2),
                     Row(
                       children: [
-                        Icon(Icons.location_on, color: _kOrange, size: 12),
+                        Icon(Icons.location_on, color: _kOrange, size: 14),
                         SizedBox(width: 2),
                         Text(
                           'Douala, Akwa',
                           style: TextStyle(
-                            fontFamily: 'NunitoSans',
                             fontSize: 12,
-                            color: _kSecondary,
+                            color: _kMuted,
                           ),
                         ),
                       ],
@@ -258,15 +232,14 @@ class _Header extends StatelessWidget {
                         color: _kCharcoal, size: 22),
                   ),
                   Positioned(
-                    top: 6,
-                    right: 6,
+                    top: 0,
+                    right: 0,
                     child: Container(
                       width: 8,
                       height: 8,
-                      decoration: BoxDecoration(
-                        color: _kRed,
+                      decoration: const BoxDecoration(
+                        color: _kOrange,
                         shape: BoxShape.circle,
-                        border: Border.all(color: _kWhite, width: 1.5),
                       ),
                     ),
                   ),
@@ -282,33 +255,38 @@ class _Header extends StatelessWidget {
 
 // ─── Search bar ────────────────────────────────────────────────────────────
 class _SearchBar extends StatelessWidget {
+  const _SearchBar();
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: _kWhite,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: _kCardShadow,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Icon(Icons.search, color: _kSecondary.withValues(alpha: 0.7), size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Cherche un plat, un restaurant...',
-                style: TextStyle(
-                  fontFamily: 'NunitoSans',
-                  fontSize: 14,
-                  color: _kSecondary.withValues(alpha: 0.5),
+      padding: const EdgeInsets.symmetric(horizontal: _kHPad),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.push('/search'),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: _kWhite,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: _kCardShadow,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: _kMuted, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Cherche un plat, un restaurant...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _kMuted.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -317,86 +295,94 @@ class _SearchBar extends StatelessWidget {
 
 // ─── Daily banner ──────────────────────────────────────────────────────────
 class _DailyBanner extends StatelessWidget {
+  const _DailyBanner();
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          height: 192,
-          width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              const _DishPlaceholder(),
-              const DecoratedBox(
+      padding: const EdgeInsets.symmetric(horizontal: _kHPad),
+      child: Container(
+        height: 192,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [_kOrange, _kOrangeDeep],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [Color(0xCC000000), Color(0x00000000)],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Color(0xCC000000), Color(0x00000000)],
-                  ),
+                  color: _kRed,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-              ),
-              Positioned(
-                top: 16,
-                left: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _kRed,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.local_fire_department, size: 12, color: _kWhite),
-                      SizedBox(width: 4),
-                      Text(
-                        'DU JOUR',
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          color: _kWhite,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(Icons.local_fire_department,
+                        size: 12, color: _kWhite),
+                    SizedBox(width: 4),
                     Text(
-                      'Le Poulet DG Royal',
+                      'DU JOUR',
                       style: TextStyle(
                         fontFamily: 'Montserrat',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
                         color: _kWhite,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Une explosion de saveurs camerounaises',
-                      style: TextStyle(
-                        fontFamily: 'NunitoSans',
-                        fontSize: 12,
-                        color: Color(0xCCFFFFFF),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2.0,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Le Poulet DG Royal',
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: _kWhite,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    "L'équilibre parfait entre épices et douceur",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xCCFFFFFF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -412,10 +398,8 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: _kHPad),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             title,
@@ -423,15 +407,15 @@ class _SectionHeader extends StatelessWidget {
               fontFamily: 'Montserrat',
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: _kCharcoal,
+              color: _kInk,
             ),
           ),
+          const Spacer(),
           if (action != null)
             Text(
               action!,
               style: const TextStyle(
-                fontFamily: 'NunitoSans',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: _kOrange,
               ),
@@ -454,9 +438,9 @@ class _CategoryChips extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: _kHPad),
         itemCount: _mockCategories.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) {
           final c = _mockCategories[i];
           final isActive = c == active;
@@ -464,14 +448,16 @@ class _CategoryChips extends StatelessWidget {
             onTap: () => onTap(c),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isActive ? _kOrange : _kWhite,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: _kOrange.withValues(alpha: 0.3),
+                          color: _kOrange.withValues(alpha: 0.2),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -481,10 +467,9 @@ class _CategoryChips extends StatelessWidget {
               child: Text(
                 c,
                 style: TextStyle(
-                  fontFamily: 'NunitoSans',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isActive ? _kWhite : _kCharcoal,
+                  color: isActive ? _kWhite : _kInk,
                 ),
               ),
             ),
@@ -503,24 +488,24 @@ class _RestaurantsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final useMock = cooks.isEmpty;
-    final count = useMock ? _mockCooks.length : cooks.length;
+    final count = useMock ? _mockRestaurants.length : cooks.length;
 
     return SizedBox(
       height: 248,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: _kHPad),
         itemCount: count,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 16),
         itemBuilder: (_, i) {
           if (useMock) {
-            final m = _mockCooks[i];
+            final m = _mockRestaurants[i];
             return _RestaurantCard(
               name: m.name,
               area: m.area,
               rating: m.rating,
               eta: m.eta,
-              img: m.img,
+              gradient: m.gradient,
             );
           }
           final c = cooks[i];
@@ -531,7 +516,7 @@ class _RestaurantsRow extends StatelessWidget {
                 : (c.landmark ?? 'Douala'),
             rating: c.avgRating,
             eta: '25-35 min',
-            img: _mockCooks[i % _mockCooks.length].img,
+            gradient: _mockRestaurants[i % _mockRestaurants.length].gradient,
           );
         },
       ),
@@ -544,13 +529,13 @@ class _RestaurantCard extends StatelessWidget {
   final String area;
   final double rating;
   final String eta;
-  final String img;
+  final List<Color> gradient;
   const _RestaurantCard({
     required this.name,
     required this.area,
     required this.rating,
     required this.eta,
-    required this.img,
+    required this.gradient,
   });
 
   @override
@@ -567,44 +552,46 @@ class _RestaurantCard extends StatelessWidget {
         children: [
           Stack(
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: SizedBox(
-                  height: 144,
-                  width: double.infinity,
-                  child: _DishImage(url: img),
+              Container(
+                height: 144,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  gradient: LinearGradient(
+                    colors: gradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
+                alignment: Alignment.center,
+                child: Icon(Icons.restaurant,
+                    color: _kWhite.withValues(alpha: 0.3), size: 48),
               ),
               Positioned(
-                top: 10,
-                right: 10,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _kWhite.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(999),
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _kWhite.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 14),
+                      const SizedBox(width: 3),
+                      Text(
+                        rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _kInk,
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star, color: Color(0xFFD4A017), size: 12),
-                          const SizedBox(width: 3),
-                          Text(
-                            rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              fontFamily: 'Montserrat',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: _kCharcoal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -623,10 +610,10 @@ class _RestaurantCard extends StatelessWidget {
                     fontFamily: 'Montserrat',
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: _kCharcoal,
+                    color: _kInk,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -635,32 +622,31 @@ class _RestaurantCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontFamily: 'NunitoSans',
                           fontSize: 12,
-                          color: _kSecondary,
+                          color: _kMuted,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _kCreme,
-                        borderRadius: BorderRadius.circular(999),
+                        color: _kSoftBg,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.access_time,
-                              size: 11, color: _kSecondary),
+                          const Icon(Icons.schedule,
+                              size: 14, color: _kMuted),
                           const SizedBox(width: 3),
                           Text(
                             eta,
                             style: const TextStyle(
-                              fontFamily: 'NunitoSans',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _kSecondary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _kMuted,
                             ),
                           ),
                         ],
@@ -685,10 +671,10 @@ class _PopularGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final useMock = items.isEmpty;
-    final count = useMock ? _mockMenu.length : items.length;
+    final count = useMock ? _mockDishes.length : items.length;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: _kHPad),
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
         shrinkWrap: true,
@@ -701,11 +687,11 @@ class _PopularGrid extends ConsumerWidget {
         ),
         itemBuilder: (_, i) {
           if (useMock) {
-            final m = _mockMenu[i];
+            final m = _mockDishes[i];
             return _DishCard(
               name: m.name,
               priceXaf: m.price,
-              img: m.img,
+              gradient: m.gradient,
               onAdd: () => ref.read(cartProvider.notifier).addItem(
                     CartItem(
                       menuItemId: 'mock-$i',
@@ -713,8 +699,7 @@ class _PopularGrid extends ConsumerWidget {
                       priceXaf: m.price,
                       quantity: 1,
                       cookId: 'mock-cook',
-                      cookName: 'Chez Mama Ngono',
-                      imageUrl: m.img,
+                      cookName: 'Maman Catherine',
                     ),
                   ),
             );
@@ -723,7 +708,7 @@ class _PopularGrid extends ConsumerWidget {
           return _DishCard(
             name: it.name,
             priceXaf: it.priceXaf,
-            img: it.imageUrl ?? _mockMenu[i % _mockMenu.length].img,
+            gradient: _dishGradients[i % _dishGradients.length],
             onAdd: () => ref.read(cartProvider.notifier).addItem(
                   CartItem(
                     menuItemId: it.id,
@@ -745,12 +730,12 @@ class _PopularGrid extends ConsumerWidget {
 class _DishCard extends StatelessWidget {
   final String name;
   final int priceXaf;
-  final String img;
+  final List<Color> gradient;
   final VoidCallback onAdd;
   const _DishCard({
     required this.name,
     required this.priceXaf,
-    required this.img,
+    required this.gradient,
     required this.onAdd,
   });
 
@@ -771,21 +756,37 @@ class _DishCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _DishImage(url: img, radius: 14),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.restaurant,
+                      color: _kWhite.withValues(alpha: 0.4), size: 40),
                 ),
                 Positioned(
-                  right: 6,
-                  bottom: 6,
+                  right: 8,
+                  bottom: 8,
                   child: GestureDetector(
                     onTap: onAdd,
                     child: Container(
                       width: 32,
                       height: 32,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: _kForest,
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: const Icon(Icons.add, color: _kWhite, size: 18),
                     ),
@@ -794,7 +795,7 @@ class _DishCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
@@ -802,14 +803,13 @@ class _DishCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontFamily: 'NunitoSans',
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: _kCharcoal,
+                color: _kInk,
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 4),
             child: Text(
