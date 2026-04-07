@@ -77,10 +77,18 @@ class HomeRepository {
   }
 
   PaginatedResult<MenuItem> _parseMenuItemsResponse(dynamic data) {
+    // Unwrap envelope {success, data: {...}} si présent.
+    if (data is Map<String, dynamic> && data['data'] is Map<String, dynamic>) {
+      data = data['data'];
+    }
     if (data is Map<String, dynamic>) {
-      final list = (data['data'] as List<dynamic>? ?? [])
-          .map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final raw = data['data'] ?? data['items'] ?? data['results'] ?? const [];
+      final list = (raw is List)
+          ? raw
+              .whereType<Map<String, dynamic>>()
+              .map(MenuItem.fromJson)
+              .toList()
+          : <MenuItem>[];
       return PaginatedResult(
         data: list,
         total: (data['total'] as num?)?.toInt() ?? list.length,
@@ -89,18 +97,27 @@ class HomeRepository {
       );
     }
     if (data is List) {
-      final list =
-          data.map((e) => MenuItem.fromJson(e as Map<String, dynamic>)).toList();
+      final list = data
+          .whereType<Map<String, dynamic>>()
+          .map(MenuItem.fromJson)
+          .toList();
       return PaginatedResult(data: list, total: list.length, page: 1, totalPages: 1);
     }
     return const PaginatedResult(data: [], total: 0, page: 1, totalPages: 1);
   }
 
   PaginatedResult<Cook> _parseCooksResponse(dynamic data) {
+    if (data is Map<String, dynamic> && data['data'] is Map<String, dynamic>) {
+      data = data['data'];
+    }
     if (data is Map<String, dynamic>) {
-      final list = (data['data'] as List<dynamic>? ?? [])
-          .map((e) => Cook.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final raw = data['data'] ?? data['items'] ?? data['results'] ?? const [];
+      final list = (raw is List)
+          ? raw
+              .whereType<Map<String, dynamic>>()
+              .map(Cook.fromJson)
+              .toList()
+          : <Cook>[];
       return PaginatedResult(
         data: list,
         total: (data['total'] as num?)?.toInt() ?? list.length,
@@ -110,7 +127,7 @@ class HomeRepository {
     }
     if (data is List) {
       final list =
-          data.map((e) => Cook.fromJson(e as Map<String, dynamic>)).toList();
+          data.whereType<Map<String, dynamic>>().map(Cook.fromJson).toList();
       return PaginatedResult(data: list, total: list.length, page: 1, totalPages: 1);
     }
     return const PaginatedResult(data: [], total: 0, page: 1, totalPages: 1);

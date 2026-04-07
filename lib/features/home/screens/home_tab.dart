@@ -1,448 +1,268 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_colors.dart';
+
 import '../../../core/utils/fcfa_formatter.dart';
-import '../../../shared/widgets/loading_shimmer.dart';
+import '../../cart/providers/cart_provider.dart';
 import '../data/models/cook.dart';
 import '../data/models/menu_item.dart';
 import '../providers/home_provider.dart';
-import '../../cart/providers/cart_provider.dart';
 
-class HomeTab extends ConsumerWidget {
+// ─── Design tokens (Culinary Signature) ────────────────────────────────────
+const _kCreme = Color(0xFFF5F5F0);
+const _kWhite = Color(0xFFFFFFFF);
+const _kOrange = Color(0xFFF57C20);
+const _kCharcoal = Color(0xFF3D3D3D);
+const _kForest = Color(0xFF1B4332);
+const _kRed = Color(0xFFE8413C);
+const _kSecondary = Color(0xFF6B7280);
+
+const _kCardShadow = [
+  BoxShadow(
+    color: Color(0x08000000),
+    offset: Offset(0, 4),
+    blurRadius: 12,
+  ),
+];
+
+// ─── Mock data (fallback si l'API ne répond pas) ───────────────────────────
+const _mockMenu = <_MockDish>[
+  _MockDish('Ndolé Viande', 2500,
+      'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=300&h=300&fit=crop'),
+  _MockDish('Poisson Braisé', 4000,
+      'https://images.unsplash.com/photo-1534604973900-c43ab4c2e0ab?w=300&h=300&fit=crop'),
+  _MockDish('Beignets Haricot', 1000,
+      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&h=300&fit=crop'),
+  _MockDish('Salade Mixte', 1500,
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300&h=300&fit=crop'),
+];
+
+const _mockCooks = <_MockCook>[
+  _MockCook('Chez Mama Ngono', 'Akwa, Douala', 4.8, '25-35 min',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&h=300&fit=crop'),
+  _MockCook('La Table de Bonas', 'Bonapriso, Douala', 4.7, '30-40 min',
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&h=300&fit=crop'),
+];
+
+const _mockCategories = [
+  'Plats traditionnels',
+  'Grillades',
+  'Beignets',
+  'Poissons',
+  'Boissons',
+];
+
+class _MockDish {
+  final String name;
+  final int price;
+  final String img;
+  const _MockDish(this.name, this.price, this.img);
+}
+
+class _MockCook {
+  final String name;
+  final String area;
+  final double rating;
+  final String eta;
+  final String img;
+  const _MockCook(this.name, this.area, this.rating, this.eta, this.img);
+}
+
+// ─── Screen ────────────────────────────────────────────────────────────────
+class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dailyAsync = ref.watch(dailySpecialsProvider);
+  ConsumerState<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends ConsumerState<HomeTab> {
+  String _activeCategory = _mockCategories.first;
+
+  @override
+  Widget build(BuildContext context) {
     final cooksAsync = ref.watch(cooksProvider);
-    ref.watch(filteredMenuItemsProvider);
-    final categories = ref.watch(availableCategoriesProvider);
-    final selectedCategory = ref.watch(selectedCategoryProvider);
-    final cartCount = ref.watch(
-        cartProvider.select((items) => items.fold(0, (s, i) => s + i.quantity)));
+    final menuAsync = ref.watch(filteredMenuItemsProvider);
+
+    final cooks = cooksAsync.maybeWhen(
+      data: (r) => r.data,
+      orElse: () => const <Cook>[],
+    );
+    final menu = menuAsync.maybeWhen(
+      data: (r) => r.data,
+      orElse: () => const <MenuItem>[],
+    );
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: _kCreme,
       body: RefreshIndicator(
-        color: AppColors.primaryVibrant,
+        color: _kOrange,
         onRefresh: () async {
-          ref.invalidate(dailySpecialsProvider);
           ref.invalidate(cooksProvider);
           ref.invalidate(filteredMenuItemsProvider);
+          ref.invalidate(dailySpecialsProvider);
         },
-        child: CustomScrollView(
-          slivers: [
-            // ── Custom AppBar ──────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Row(
-                    children: [
-                      // Avatar
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.person, color: AppColors.primary, size: 22),
-                      ),
-                      const SizedBox(width: 10),
-                      // Salutation + localisation
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Bonjour Arthur 👋',
-                              style: TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.onSurface,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on,
-                                    color: AppColors.primary, size: 12),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Douala, Akwa',
-                                  style: TextStyle(
-                                    fontFamily: 'NunitoSans',
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Notification bell + badge
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.notifications_none_rounded,
-                                color: AppColors.onSurface, size: 22),
-                          ),
-                          Positioned(
-                            top: -2,
-                            right: -2,
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.surfaceWhite, width: 1.5),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // (legacy hidden block kept for diff minimization)
-                      Offstage(
-                        offstage: true,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            GestureDetector(
-                              onTap: () => context.go('/cart'),
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surfaceContainerLow,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                        Icons.shopping_bag_outlined,
-                                        color: AppColors.onSurface,
-                                        size: 20),
-                                  ),
-                                  if (cartCount > 0)
-                                    Positioned(
-                                      top: -4,
-                                      right: -4,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primaryVibrant,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        child: Text(
-                                          cartCount > 99
-                                              ? '99+'
-                                              : '$cartCount',
-                                          style: TextStyle(fontFamily: 'NunitoSans',
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Avatar
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryLight,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.person_outline,
-                                  color: AppColors.primary, size: 20),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.only(top: 88, bottom: 24),
+              children: [
+                const SizedBox(height: 8),
+                _SearchBar(),
+                const SizedBox(height: 20),
+                _DailyBanner(),
+                const SizedBox(height: 24),
+                _SectionHeader(title: 'Catégories', action: 'Tout voir'),
+                const SizedBox(height: 12),
+                _CategoryChips(
+                  active: _activeCategory,
+                  onTap: (c) => setState(() => _activeCategory = c),
+                ),
+                const SizedBox(height: 24),
+                const _SectionHeader(title: 'Restaurants près de toi'),
+                const SizedBox(height: 12),
+                _RestaurantsRow(cooks: cooks),
+                const SizedBox(height: 24),
+                _SectionHeader(
+                    title: 'Plats populaires', action: 'Le goût de chez nous'),
+                const SizedBox(height: 12),
+                _PopularGrid(items: menu),
+                const SizedBox(height: 16),
+              ],
+            ),
+            const _Header(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Header ────────────────────────────────────────────────────────────────
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          color: _kCreme.withValues(alpha: 0.7),
+          padding: EdgeInsets.fromLTRB(16, top + 8, 16, 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    fit: BoxFit.cover,
+                    image: NetworkImage(
+                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop'),
                   ),
                 ),
               ),
-            ),
-
-            // ── Barre de recherche ─────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: GestureDetector(
-                  onTap: () => context.go('/search'),
-                  child: Container(
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primaryVibrant.withValues(alpha: 0.12),
-                          AppColors.secondaryVibrant.withValues(alpha: 0.10),
-                        ],
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Bonjour Arthur 👋',
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _kCharcoal,
+                        height: 1.2,
                       ),
-                      borderRadius: BorderRadius.circular(100),
                     ),
-                    child: Row(
+                    SizedBox(height: 2),
+                    Row(
                       children: [
-                        const SizedBox(width: 16),
-                        Icon(Icons.search,
-                            color: AppColors.primary, size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Une envie de Ndole ou de...',
-                            style: TextStyle(fontFamily: 'NunitoSans',
-                              color: AppColors.textTertiary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
+                        Icon(Icons.location_on, color: _kOrange, size: 12),
+                        SizedBox(width: 2),
+                        Text(
+                          'Douala, Akwa',
+                          style: TextStyle(
+                            fontFamily: 'NunitoSans',
+                            fontSize: 12,
+                            color: _kSecondary,
                           ),
-                        ),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLowest,
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: const Icon(Icons.tune_rounded,
-                              color: AppColors.primary, size: 18),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _kWhite,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _kCardShadow,
+                    ),
+                    child: const Icon(Icons.notifications_none_rounded,
+                        color: _kCharcoal, size: 22),
+                  ),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _kRed,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _kWhite, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-            // ── Banniere promotionnelle ────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: Container(
-                  height: 160,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE06A10), Color(0xFFF57C20)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Motif décoratif
-                      Positioned(
-                        right: -20,
-                        bottom: -20,
-                        child: Icon(
-                          Icons.restaurant,
-                          size: 140,
-                          color: Colors.white.withValues(alpha: 0.08),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.local_fire_department,
-                                      color: Colors.white, size: 12),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'DU JOUR',
-                                    style: TextStyle(
-                                      fontFamily: 'NunitoSans',
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Saveurs du Cameroun\nlivrées chez vous',
-                              style: TextStyle(fontFamily: 'Montserrat',
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '-20% sur votre 1ere commande',
-                              style: TextStyle(fontFamily: 'NunitoSans',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white.withValues(alpha: 0.85),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+// ─── Search bar ────────────────────────────────────────────────────────────
+class _SearchBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: _kWhite,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: _kCardShadow,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Icon(Icons.search, color: _kSecondary.withValues(alpha: 0.7), size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Cherche un plat, un restaurant...',
+                style: TextStyle(
+                  fontFamily: 'NunitoSans',
+                  fontSize: 14,
+                  color: _kSecondary.withValues(alpha: 0.5),
                 ),
-              ),
-            ),
-
-            // ── La Carte des Saveurs ───────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
-                child: _SectionHeader(
-                  title: 'La Carte des Saveurs',
-                  onSeeAll: () => context.go('/search'),
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: _SavorCategoriesRow(
-                  categories: categories,
-                  selected: selectedCategory,
-                  onSelect: (cat) =>
-                      ref.read(selectedCategoryProvider.notifier).state = cat,
-                ),
-              ),
-            ),
-
-            // ── Le Meilleur de Douala ──────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
-                child: _SectionHeader(
-                  title: 'Le Meilleur de Douala',
-                  onSeeAll: () {},
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              sliver: cooksAsync.when(
-                loading: () => SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => const Padding(
-                      padding: EdgeInsets.only(bottom: 20),
-                      child: _RestaurantCardShimmer(),
-                    ),
-                    childCount: 3,
-                  ),
-                ),
-                error: (e, _) => SliverToBoxAdapter(
-                  child: _ErrorCard(
-                    message: e.toString(),
-                    onRetry: () => ref.invalidate(cooksProvider),
-                  ),
-                ),
-                data: (result) {
-                  if (result.data.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: _EmptyState(
-                        emoji: '👩\u200d🍳',
-                        message: 'Aucune cuisiniere disponible',
-                      ),
-                    );
-                  }
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: _SavorRestaurantCard(
-                          cook: result.data[i],
-                          onTap: () => context
-                              .go('/restaurant/${result.data[i].id}'),
-                        ),
-                      ),
-                      childCount: result.data.length,
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // ── Populaire en ce Moment ─────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _SectionHeader(
-                  title: 'Populaire en ce Moment',
-                  onSeeAll: () => context.go('/search'),
-                  trailing: const Icon(Icons.arrow_forward,
-                      color: AppColors.primaryVibrant, size: 20),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              sliver: dailyAsync.when(
-                loading: () => SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
-                      child: _PopularItemShimmer(),
-                    ),
-                    childCount: 4,
-                  ),
-                ),
-                error: (e, _) => SliverToBoxAdapter(
-                  child: Text(e.toString(),
-                      style: TextStyle(fontFamily: 'NunitoSans',
-                          color: AppColors.textSecondary, fontSize: 12)),
-                ),
-                data: (result) {
-                  if (result.data.isEmpty) {
-                    return const SliverToBoxAdapter(
-                      child: SizedBox.shrink(),
-                    );
-                  }
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _PopularDishRow(item: result.data[i]),
-                      ),
-                      childCount: result.data.length,
-                    ),
-                  );
-                },
               ),
             ),
           ],
@@ -452,143 +272,182 @@ class HomeTab extends ConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// WIDGETS INTERNES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ── Section Header ──────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback? onSeeAll;
-  final Widget? trailing;
-
-  const _SectionHeader({required this.title, this.onSeeAll, this.trailing});
-
+// ─── Daily banner ──────────────────────────────────────────────────────────
+class _DailyBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: TextStyle(fontFamily: 'Montserrat',
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            color: AppColors.onSurface,
-          ),
-        ),
-        if (onSeeAll != null)
-          GestureDetector(
-            onTap: onSeeAll,
-            child: trailing ??
-                Text(
-                  'Tout Voir',
-                  style: TextStyle(fontFamily: 'NunitoSans',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryVibrant,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 192,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=600&h=400&fit=crop',
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(color: _kCharcoal),
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0xCC000000), Color(0x00000000)],
                   ),
                 ),
+              ),
+              Positioned(
+                top: 16,
+                left: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _kRed,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.local_fire_department, size: 12, color: _kWhite),
+                      SizedBox(width: 4),
+                      Text(
+                        'DU JOUR',
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          color: _kWhite,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Le Poulet DG Royal',
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: _kWhite,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Une explosion de saveurs camerounaises',
+                      style: TextStyle(
+                        fontFamily: 'NunitoSans',
+                        fontSize: 12,
+                        color: Color(0xCCFFFFFF),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }
 
-// ── Categories (cercles style Savor) ────────────────────────────────────────
-
-class _SavorCategoriesRow extends StatelessWidget {
-  final List<String> categories;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-
-  static const _categoryData = <String, (String, Color)>{
-    'Tous': ('🍽️', AppColors.primaryVibrant),
-    'Ndole': ('🥘', Color(0xFF006B23)),
-    'Poulet DG': ('🍗', Color(0xFFA03C00)),
-    'Grilled Fish': ('🐟', Color(0xFF705900)),
-    'Koki': ('🫘', Color(0xFF884D00)),
-    'viandes': ('🍖', Color(0xFFA03C00)),
-    'poissons': ('🐟', Color(0xFF705900)),
-    'legumes': ('🥬', Color(0xFF006B23)),
-    'grillades': ('🍗', Color(0xFFA03C00)),
-    'soupes': ('🥘', Color(0xFF884D00)),
-    'boissons': ('🥤', Color(0xFF705900)),
-    'riz': ('🍚', Color(0xFF884D00)),
-    'plantain': ('🍌', Color(0xFF705900)),
-    'desserts': ('🍰', Color(0xFFA03C00)),
-    'snacks': ('🥙', Color(0xFF884D00)),
-  };
-
-  const _SavorCategoriesRow({
-    required this.categories,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  (String, Color) _getData(String cat) {
-    final key = cat.toLowerCase();
-    for (final entry in _categoryData.entries) {
-      if (entry.key.toLowerCase() == key) return entry.value;
-    }
-    return ('🍽️', AppColors.primaryVibrant);
-  }
+// ─── Section header ────────────────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String? action;
+  const _SectionHeader({required this.title, this.action});
 
   @override
   Widget build(BuildContext context) {
-    final items = ['Tous', ...categories];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Montserrat',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: _kCharcoal,
+            ),
+          ),
+          if (action != null)
+            Text(
+              action!,
+              style: const TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _kOrange,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
+// ─── Categories ────────────────────────────────────────────────────────────
+class _CategoryChips extends StatelessWidget {
+  final String active;
+  final ValueChanged<String> onTap;
+  const _CategoryChips({required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
-      height: 100,
+      height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: items.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 16),
-        itemBuilder: (context, i) {
-          final label = items[i];
-          final isAll = label == 'Tous';
-          final isActive = isAll ? selected == null : selected == label;
-          final (emoji, tint) = _getData(label);
-
+        itemCount: _mockCategories.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (_, i) {
+          final c = _mockCategories[i];
+          final isActive = c == active;
           return GestureDetector(
-            onTap: () => onSelect(isAll ? null : label),
-            child: Column(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: isActive
-                        ? Border.all(
-                            color: AppColors.primaryVibrant, width: 3)
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(emoji,
-                        style: const TextStyle(fontSize: 28)),
-                  ),
+            onTap: () => onTap(c),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: isActive ? _kOrange : _kWhite,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: _kOrange.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : _kCardShadow,
+              ),
+              child: Text(
+                c,
+                style: TextStyle(
+                  fontFamily: 'NunitoSans',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? _kWhite : _kCharcoal,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  label,
-                  style: TextStyle(fontFamily: 'NunitoSans',
-                    fontSize: 11,
-                    fontWeight:
-                        isActive ? FontWeight.w700 : FontWeight.w600,
-                    color: isActive
-                        ? AppColors.primaryVibrant
-                        : AppColors.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              ),
             ),
           );
         },
@@ -597,537 +456,342 @@ class _SavorCategoriesRow extends StatelessWidget {
   }
 }
 
-// ── Restaurant Card (style Savor : large, premium) ──────────────────────────
-
-class _SavorRestaurantCard extends StatelessWidget {
-  final Cook cook;
-  final VoidCallback onTap;
-
-  const _SavorRestaurantCard({required this.cook, required this.onTap});
+// ─── Restaurants row ───────────────────────────────────────────────────────
+class _RestaurantsRow extends StatelessWidget {
+  final List<Cook> cooks;
+  const _RestaurantsRow({required this.cooks});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: cook.isOpenNow ? onTap : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.onSurface.withValues(alpha: 0.06),
-              blurRadius: 24,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image zone (60% ~170px)
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20)),
-                  child: Container(
-                    height: 170,
-                    width: double.infinity,
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    child: const Center(
-                      child:
-                          Text('👩\u200d🍳', style: TextStyle(fontSize: 56)),
-                    ),
-                  ),
-                ),
-                // Badge LIVRAISON RAPIDE
-                Positioned(
-                  left: 12,
-                  top: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryVibrant,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      'LIVRAISON RAPIDE',
-                      style: TextStyle(fontFamily: 'NunitoSans',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-                // Badge ICONIC
-                if (cook.avgRating >= 4.5)
-                  Positioned(
-                    left: 140,
-                    top: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Text(
-                        'ICONIC',
-                        style: TextStyle(fontFamily: 'NunitoSans',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onSurface,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                // Badge note dorée
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryVibrant,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('⭐', style: TextStyle(fontSize: 11)),
-                        const SizedBox(width: 3),
-                        Text(
-                          cook.avgRating.toStringAsFixed(1),
-                          style: TextStyle(fontFamily: 'NunitoSans',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Overlay fermé
-                if (!cook.isOpenNow)
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20)),
-                    child: Container(
-                      height: 170,
-                      width: double.infinity,
-                      color: AppColors.overlay,
-                      child: Center(
-                        child: Text(
-                          'FERME',
-                          style: TextStyle(fontFamily: 'NunitoSans',
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            // Infos sous l'image
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          cook.displayName,
-                          style: TextStyle(fontFamily: 'Montserrat',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          cook.specialty.take(3).join(' · '),
-                          style: TextStyle(fontFamily: 'NunitoSans',
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'IDEAL AVEC DU BOBOLO',
-                        style: TextStyle(fontFamily: 'NunitoSans',
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textTertiary,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '25-35 min',
-                        style: TextStyle(fontFamily: 'NunitoSans',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryVibrant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    final useMock = cooks.isEmpty;
+    final count = useMock ? _mockCooks.length : cooks.length;
+
+    return SizedBox(
+      height: 248,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: count,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (_, i) {
+          if (useMock) {
+            final m = _mockCooks[i];
+            return _RestaurantCard(
+              name: m.name,
+              area: m.area,
+              rating: m.rating,
+              eta: m.eta,
+              img: m.img,
+            );
+          }
+          final c = cooks[i];
+          return _RestaurantCard(
+            name: c.displayName,
+            area: c.quarter != null
+                ? '${c.quarter!.name}, ${c.quarter!.city}'
+                : (c.landmark ?? 'Douala'),
+            rating: c.avgRating,
+            eta: '25-35 min',
+            img: _mockCooks[i % _mockCooks.length].img,
+          );
+        },
       ),
     );
   }
 }
 
-// ── Popular Dish Row ────────────────────────────────────────────────────────
-
-class _PopularDishRow extends ConsumerWidget {
-  final MenuItem item;
-
-  const _PopularDishRow({required this.item});
+class _RestaurantCard extends StatelessWidget {
+  final String name;
+  final String area;
+  final double rating;
+  final String eta;
+  final String img;
+  const _RestaurantCard({
+    required this.name,
+    required this.area,
+    required this.rating,
+    required this.eta,
+    required this.img,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(cartProvider.notifier);
-    final isBestSeller = (item.isDailySpecial);
-
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      width: 256,
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _kWhite,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: _kCardShadow,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image ronde
-          ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: SizedBox(
-              width: 60,
-              height: 60,
-              child: item.imageUrl != null
-                  ? Image.network(
-                      item.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (ctx, error, stack) => Container(
-                        color: AppColors.primaryLight,
-                        child: const Center(
-                            child: Text('🍲',
-                                style: TextStyle(fontSize: 24))),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Image.network(
+                  img,
+                  height: 144,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    height: 144,
+                    color: _kCreme,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _kWhite.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                    )
-                  : Container(
-                      color: AppColors.primaryLight,
-                      child: const Center(
-                          child: Text('🍲',
-                              style: TextStyle(fontSize: 24))),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star, color: Color(0xFFD4A017), size: 12),
+                          const SizedBox(width: 3),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontFamily: 'Montserrat',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _kCharcoal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-            ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          // Nom + description + badges
-          Expanded(
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.name,
-                  style: TextStyle(fontFamily: 'Montserrat',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                ),
-                if (item.description != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    item.description!,
-                    style: TextStyle(fontFamily: 'NunitoSans',
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _kCharcoal,
                   ),
-                ],
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    if (isBestSeller)
-                      _Badge(
-                          label: 'MEILLEURE VENTE',
-                          color: AppColors.primaryVibrant),
-                    if (item.category != null && !isBestSeller)
-                      _Badge(
-                          label: 'CHOIX DU CHEF',
-                          color: AppColors.tertiary),
+                    Expanded(
+                      child: Text(
+                        area,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'NunitoSans',
+                          fontSize: 12,
+                          color: _kSecondary,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _kCreme,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.access_time,
+                              size: 11, color: _kSecondary),
+                          const SizedBox(width: 3),
+                          Text(
+                            eta,
+                            style: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _kSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          // Prix + bouton ajouter
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                item.priceXaf.toFcfa(),
-                style: const TextStyle(
-                  fontFamily: 'SpaceMono',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.gold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (item.canOrder)
-                GestureDetector(
-                  onTap: () {
-                    if (item.cook == null) return;
-                    notifier.addItem(CartItem(
-                      menuItemId: item.id,
-                      name: item.name,
-                      priceXaf: item.priceXaf,
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Popular grid ──────────────────────────────────────────────────────────
+class _PopularGrid extends ConsumerWidget {
+  final List<MenuItem> items;
+  const _PopularGrid({required this.items});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final useMock = items.isEmpty;
+    final count = useMock ? _mockMenu.length : items.length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: count,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.78,
+        ),
+        itemBuilder: (_, i) {
+          if (useMock) {
+            final m = _mockMenu[i];
+            return _DishCard(
+              name: m.name,
+              priceXaf: m.price,
+              img: m.img,
+              onAdd: () => ref.read(cartProvider.notifier).addItem(
+                    CartItem(
+                      menuItemId: 'mock-$i',
+                      name: m.name,
+                      priceXaf: m.price,
                       quantity: 1,
-                      cookId: item.cook!.id,
-                      cookName: item.cook!.displayName,
-                      imageUrl: item.imageUrl,
-                    ));
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      '+ Ajouter',
-                      style: TextStyle(fontFamily: 'NunitoSans',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                      cookId: 'mock-cook',
+                      cookName: 'Chez Mama Ngono',
+                      imageUrl: m.img,
                     ),
                   ),
+            );
+          }
+          final it = items[i];
+          return _DishCard(
+            name: it.name,
+            priceXaf: it.priceXaf,
+            img: it.imageUrl ?? _mockMenu[i % _mockMenu.length].img,
+            onAdd: () => ref.read(cartProvider.notifier).addItem(
+                  CartItem(
+                    menuItemId: it.id,
+                    name: it.name,
+                    priceXaf: it.priceXaf,
+                    quantity: 1,
+                    cookId: it.cook?.id ?? '',
+                    cookName: it.cook?.displayName ?? '',
+                    imageUrl: it.imageUrl,
+                  ),
                 ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-// ── Badge widget ────────────────────────────────────────────────────────────
-
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _Badge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontFamily: 'NunitoSans',
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: color,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Error Card ──────────────────────────────────────────────────────────────
-
-class _ErrorCard extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-
-  const _ErrorCard({required this.message, required this.onRetry});
+class _DishCard extends StatelessWidget {
+  final String name;
+  final int priceXaf;
+  final String img;
+  final VoidCallback onAdd;
+  const _DishCard({
+    required this.name,
+    required this.priceXaf,
+    required this.img,
+    required this.onAdd,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
+        color: _kWhite,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: _kCardShadow,
       ),
-      child: Column(
-        children: [
-          const Text('😕', style: TextStyle(fontSize: 40)),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'NunitoSans',
-                fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: onRetry,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                'Reessayer',
-                style: TextStyle(fontFamily: 'NunitoSans',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Empty State ─────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  final String emoji;
-  final String message;
-
-  const _EmptyState({required this.emoji, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 48)),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: TextStyle(fontFamily: 'NunitoSans',
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Shimmers ────────────────────────────────────────────────────────────────
-
-class _RestaurantCardShimmer extends StatelessWidget {
-  const _RestaurantCardShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 280,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const ShimmerBox(width: double.infinity, height: 170, borderRadius: 20),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                ShimmerBox(width: 180, height: 18, borderRadius: 8),
-                SizedBox(height: 8),
-                ShimmerBox(width: 120, height: 14, borderRadius: 6),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PopularItemShimmer extends StatelessWidget {
-  const _PopularItemShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: const [
-          ShimmerBox(width: 60, height: 60, borderRadius: 30),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          AspectRatio(
+            aspectRatio: 1,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                ShimmerBox(width: 140, height: 14, borderRadius: 6),
-                SizedBox(height: 6),
-                ShimmerBox(width: 100, height: 12, borderRadius: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.network(
+                    img,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(color: _kCreme),
+                  ),
+                ),
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: GestureDetector(
+                    onTap: onAdd,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: _kForest,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add, color: _kWhite, size: 18),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-          ShimmerBox(width: 70, height: 14, borderRadius: 6),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _kCharcoal,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Text(
+              FcfaFormatter.format(priceXaf),
+              style: const TextStyle(
+                fontFamily: 'SpaceMono',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _kOrange,
+              ),
+            ),
+          ),
         ],
       ),
     );
