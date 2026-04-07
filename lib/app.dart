@@ -5,10 +5,13 @@ import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/phone_input_screen.dart';
 import 'features/auth/screens/otp_verification_screen.dart';
+import 'features/auth/screens/quartier_selection_screen.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
 import 'features/orders/screens/order_tracking_screen.dart';
+import 'features/payment/screens/payment_screen.dart';
+import 'features/rating/screens/rating_screen.dart';
 import 'features/rider_signup/screens/rider_signup_screen.dart';
 
 class App extends StatelessWidget {
@@ -18,66 +21,90 @@ class App extends StatelessWidget {
     initialLocation: '/splash',
     debugLogDiagnostics: false,
     routes: [
+      // ── Onboarding ────────────────────────────────────────────────────
+      GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
+      GoRoute(path: '/onboarding', builder: (c, s) => const OnboardingScreen()),
       GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashScreen(),
+        path: '/onboarding/phone',
+        builder: (c, s) => const PhoneInputScreen(),
       ),
       GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
-      ),
-      GoRoute(
-        path: '/phone',
-        builder: (context, state) => const PhoneInputScreen(),
-      ),
-      GoRoute(
-        path: '/otp',
-        builder: (context, state) {
-          final phone = state.extra as String? ?? '';
+        path: '/onboarding/otp',
+        builder: (c, s) {
+          final phone = s.extra as String? ?? '';
           return OtpVerificationScreen(phone: phone);
         },
       ),
       GoRoute(
+        path: '/onboarding/quartier',
+        builder: (c, s) => const QuartierSelectionScreen(),
+      ),
+      // ── Aliases (compat ancien code) ──────────────────────────────────
+      GoRoute(path: '/phone', builder: (c, s) => const PhoneInputScreen()),
+      GoRoute(
+        path: '/otp',
+        builder: (c, s) {
+          final phone = s.extra as String? ?? '';
+          return OtpVerificationScreen(phone: phone);
+        },
+      ),
+
+      // ── Tabs principaux (HomeScreen gère son propre bottom nav) ───────
+      GoRoute(
         path: '/home',
-        builder: (context, state) => const HomeScreen(initialTab: 0),
+        builder: (c, s) => const HomeScreen(initialTab: 0),
       ),
       GoRoute(
         path: '/search',
-        builder: (context, state) => const HomeScreen(initialTab: 1),
+        builder: (c, s) => const HomeScreen(initialTab: 1),
       ),
       GoRoute(
         path: '/cart',
-        builder: (context, state) => const HomeScreen(initialTab: 2),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const HomeScreen(initialTab: 3),
+        builder: (c, s) => const HomeScreen(initialTab: 2),
       ),
       GoRoute(
         path: '/orders',
-        builder: (context, state) => const HomeScreen(initialTab: 2),
+        builder: (c, s) => const HomeScreen(initialTab: 2),
       ),
       GoRoute(
+        path: '/profile',
+        builder: (c, s) => const HomeScreen(initialTab: 3),
+      ),
+
+      // ── Détails ───────────────────────────────────────────────────────
+      GoRoute(
         path: '/restaurant/:id',
-        builder: (context, state) => RestaurantDetailScreen(
-          restaurantId: state.pathParameters['id']!,
-        ),
+        builder: (c, s) =>
+            RestaurantDetailScreen(restaurantId: s.pathParameters['id']!),
       ),
       GoRoute(
         path: '/orders/:id',
-        builder: (context, state) => OrderDetailScreen(
-          orderId: state.pathParameters['id']!,
-        ),
+        builder: (c, s) =>
+            OrderDetailScreen(orderId: s.pathParameters['id']!),
       ),
       GoRoute(
         path: '/orders/:id/track',
-        builder: (context, state) => OrderTrackingScreen(
-          orderId: state.pathParameters['id']!,
-        ),
+        builder: (c, s) =>
+            OrderTrackingScreen(orderId: s.pathParameters['id']!),
       ),
       GoRoute(
+        path: '/tracking/:orderId',
+        builder: (c, s) =>
+            OrderTrackingScreen(orderId: s.pathParameters['orderId']!),
+      ),
+
+      // ── Paiement & notation ───────────────────────────────────────────
+      GoRoute(path: '/payment', builder: (c, s) => const PaymentScreen()),
+      GoRoute(
+        path: '/rating/:orderId',
+        builder: (c, s) =>
+            RatingScreen(orderId: s.pathParameters['orderId']!),
+      ),
+
+      // ── Divers ────────────────────────────────────────────────────────
+      GoRoute(
         path: '/become-rider',
-        builder: (context, state) => const RiderSignupScreen(),
+        builder: (c, s) => const RiderSignupScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
@@ -91,7 +118,7 @@ class App extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => context.go('/home'),
-              child: const Text('Retour à l\'accueil'),
+              child: const Text("Retour à l'accueil"),
             ),
           ],
         ),
