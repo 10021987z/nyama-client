@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/screens/splash_screen.dart';
@@ -141,6 +142,11 @@ class App extends StatelessWidget {
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
       locale: const Locale('fr', 'CM'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       supportedLocales: const [
         Locale('fr', 'CM'),
         Locale('fr', 'FR'),
