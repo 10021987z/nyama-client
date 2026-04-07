@@ -34,34 +34,40 @@ class NyamaBottomNavBar extends ConsumerWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
-                icon: Icons.restaurant_menu,
-                label: 'DECOUVRIR',
+                icon: Icons.home_rounded,
+                label: 'ACCUEIL',
                 isActive: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
-                icon: Icons.search,
-                label: 'EXPLORER',
+                icon: Icons.search_rounded,
+                label: 'RECHERCHE',
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
               _NavItem(
-                icon: Icons.receipt_long,
-                label: 'COMMANDES',
+                icon: Icons.shopping_bag_outlined,
+                label: 'PANIER',
                 isActive: currentIndex == 2,
                 badgeCount: cartCount,
                 onTap: () => onTap(2),
               ),
               _NavItem(
-                icon: Icons.person,
-                label: 'PROFIL',
+                icon: Icons.receipt_long_rounded,
+                label: 'COMMANDES',
                 isActive: currentIndex == 3,
                 onTap: () => onTap(3),
+              ),
+              _NavItem(
+                icon: Icons.person_rounded,
+                label: 'PROFIL',
+                isActive: currentIndex == 4,
+                onTap: () => onTap(4),
               ),
             ],
           ),
@@ -92,7 +98,7 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 78,
+        width: 64,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -64,11 +64,11 @@ class App extends StatelessWidget {
       ),
       GoRoute(
         path: '/orders',
-        builder: (c, s) => const HomeScreen(initialTab: 2),
+        builder: (c, s) => const HomeScreen(initialTab: 3),
       ),
       GoRoute(
         path: '/profile',
-        builder: (c, s) => const HomeScreen(initialTab: 3),
+        builder: (c, s) => const HomeScreen(initialTab: 4),
       ),
 
       // ── Détails ───────────────────────────────────────────────────────

@@ -41,78 +41,85 @@ class HomeTab extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: Row(
                     children: [
-                      // Gauche : burger + localisation
+                      // Avatar
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.person, color: AppColors.primary, size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      // Salutation + localisation
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(12),
+                            Text(
+                              'Bonjour Arthur 👋',
+                              style: TextStyle(
+                                fontFamily: 'Montserrat',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.onSurface,
                               ),
-                              child: const Icon(Icons.menu_rounded,
-                                  color: AppColors.onSurface, size: 20),
                             ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            Row(
                               children: [
+                                const Icon(Icons.location_on,
+                                    color: AppColors.primary, size: 12),
+                                const SizedBox(width: 2),
                                 Text(
-                                  'IDEAL AVEC DU BOBOLO',
-                                  style: TextStyle(fontFamily: 'NunitoSans',
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textTertiary,
-                                    letterSpacing: 1.2,
+                                  'Douala, Akwa',
+                                  style: TextStyle(
+                                    fontFamily: 'NunitoSans',
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
                                   ),
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(Icons.location_on,
-                                        color: AppColors.primaryVibrant,
-                                        size: 14),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      'Bonapriso, Douala',
-                                      style: TextStyle(fontFamily: 'NunitoSans',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    const Icon(Icons.keyboard_arrow_down,
-                                        color: AppColors.textSecondary,
-                                        size: 16),
-                                  ],
                                 ),
                               ],
                             ),
                           ],
                         ),
                       ),
-
-                      // Centre : titre
-                      Text(
-                        'NYAMA',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontFamily: 'Montserrat',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
-                          letterSpacing: 2,
-                        ),
+                      // Notification bell + badge
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.notifications_none_rounded,
+                                color: AppColors.onSurface, size: 22),
+                          ),
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.surfaceWhite, width: 1.5),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-
-                      // Droite : panier + avatar
-                      Expanded(
+                      // (legacy hidden block kept for diff minimization)
+                      Offstage(
+                        offstage: true,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            // Badge panier
                             GestureDetector(
                               onTap: () => context.go('/cart'),
                               child: Stack(
@@ -263,19 +270,28 @@ class HomeTab extends ConsumerWidget {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
+                                  horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: AppColors.secondaryVibrant,
+                                color: AppColors.primary,
                                 borderRadius: BorderRadius.circular(100),
                               ),
-                              child: Text(
-                                'NOUVEAU',
-                                style: TextStyle(fontFamily: 'NunitoSans',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.onSurface,
-                                  letterSpacing: 1,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.local_fire_department,
+                                      color: Colors.white, size: 12),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'DU JOUR',
+                                    style: TextStyle(
+                                      fontFamily: 'NunitoSans',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 10),

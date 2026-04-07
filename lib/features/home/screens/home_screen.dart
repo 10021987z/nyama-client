@@ -5,6 +5,7 @@ import '../../../core/network/connectivity_notifier.dart';
 import '../../../core/network/socket_provider.dart';
 import '../../../shared/widgets/bottom_nav_bar.dart';
 import '../../cart/screens/cart_screen.dart';
+import '../../orders/screens/orders_list_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../search/screens/search_screen.dart';
 import 'home_tab.dart';
@@ -25,6 +26,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     HomeTab(),
     SearchScreen(),
     CartScreen(),
+    OrdersListScreen(),
     ProfileScreen(),
   ];
 
