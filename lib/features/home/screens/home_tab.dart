@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -202,13 +201,10 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          color: _kCreme.withValues(alpha: 0.7),
-          padding: EdgeInsets.fromLTRB(_kHPad, top + 12, _kHPad, 12),
-          child: Row(
+    return Container(
+      color: _kCreme.withValues(alpha: 0.7),
+      padding: EdgeInsets.fromLTRB(_kHPad, top + 12, _kHPad, 12),
+      child: Row(
             children: [
               Container(
                 width: 40,
@@ -315,8 +311,6 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ),
       ),
     );
   }
