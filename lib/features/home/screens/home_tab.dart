@@ -149,6 +149,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
     return Scaffold(
       backgroundColor: _kCreme,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(72),
+        child: Material(
+          color: _kCreme,
+          elevation: 0,
+          child: const _Header(),
+        ),
+      ),
       body: RefreshIndicator(
         color: _kOrange,
         onRefresh: () async {
@@ -156,37 +164,30 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           ref.invalidate(filteredMenuItemsProvider);
           ref.invalidate(dailySpecialsProvider);
         },
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsets.only(top: 8, bottom: 32),
           children: [
-            const _Header(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.only(top: 8, bottom: 32),
-                children: [
-                const SizedBox(height: 8),
-                const _SearchBar(),
-                const SizedBox(height: 20),
-                const _DailyBanner(),
-                const SizedBox(height: 28),
-                const _SectionHeader(title: 'Catégories', action: 'Tout voir'),
-                const SizedBox(height: 12),
-                _CategoryChips(
-                  active: _activeCategory,
-                  onTap: (c) => setState(() => _activeCategory = c),
-                ),
-                const SizedBox(height: 28),
-                const _SectionHeader(title: 'Restaurants près de toi'),
-                const SizedBox(height: 12),
-                _RestaurantsRow(cooks: cooks),
-                const SizedBox(height: 28),
-                const _SectionHeader(
-                    title: 'Plats populaires',
-                    action: 'Le goût de chez nous'),
-                const SizedBox(height: 16),
-                _PopularGrid(items: menu),
-              ],
-              ),
+            const SizedBox(height: 8),
+            const _SearchBar(),
+            const SizedBox(height: 20),
+            const _DailyBanner(),
+            const SizedBox(height: 28),
+            const _SectionHeader(title: 'Catégories', action: 'Tout voir'),
+            const SizedBox(height: 12),
+            _CategoryChips(
+              active: _activeCategory,
+              onTap: (c) => setState(() => _activeCategory = c),
             ),
+            const SizedBox(height: 28),
+            const _SectionHeader(title: 'Restaurants près de toi'),
+            const SizedBox(height: 12),
+            _RestaurantsRow(cooks: cooks),
+            const SizedBox(height: 28),
+            const _SectionHeader(
+                title: 'Plats populaires',
+                action: 'Le goût de chez nous'),
+            const SizedBox(height: 16),
+            _PopularGrid(items: menu),
           ],
         ),
       ),
