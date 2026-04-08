@@ -71,6 +71,40 @@ class SecureStorage {
       _storage.write(key: _kFcmToken, value: token);
   static Future<String?> getFcmToken() => _storage.read(key: _kFcmToken);
 
+  // Nom de l'utilisateur (éditable dans le profil)
+  static const _kUserName = 'user_name';
+  static Future<void> saveUserName(String name) =>
+      _storage.write(key: _kUserName, value: name);
+  static Future<String?> getUserName() => _storage.read(key: _kUserName);
+
+  // Chemin local de la photo de profil
+  static const _kAvatarPath = 'user_avatar_path';
+  static Future<void> saveAvatarPath(String path) =>
+      _storage.write(key: _kAvatarPath, value: path);
+  static Future<String?> getAvatarPath() => _storage.read(key: _kAvatarPath);
+
+  // Historique de recherche (max 10 items, séparés par \u0001)
+  static const _kSearchHistory = 'search_history';
+  static Future<List<String>> getSearchHistory() async {
+    final raw = await _storage.read(key: _kSearchHistory);
+    if (raw == null || raw.isEmpty) return [];
+    return raw.split('\u0001').where((s) => s.isNotEmpty).toList();
+  }
+
+  static Future<void> addSearchHistory(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    final current = await getSearchHistory();
+    current.removeWhere((s) => s.toLowerCase() == q.toLowerCase());
+    current.insert(0, q);
+    final trimmed = current.take(10).toList();
+    await _storage.write(
+        key: _kSearchHistory, value: trimmed.join('\u0001'));
+  }
+
+  static Future<void> clearSearchHistory() =>
+      _storage.delete(key: _kSearchHistory);
+
   // Vérifie si l'utilisateur est connecté
   static Future<bool> isLoggedIn() async {
     final token = await getAccessToken();

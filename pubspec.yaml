@@ -65,6 +65,12 @@ dependencies:
   # Permissions (openAppSettings pour notifications)
   permission_handler: ^11.3.1
 
+  # Connectivité réseau (bannière offline)
+  connectivity_plus: ^6.0.5
+
+  # Image picker (photo profil)
+  image_picker: ^1.1.2
+
   # NOTE: google_fonts removed — using bundled Montserrat, NunitoSans, SpaceMono
 
 dev_dependencies:

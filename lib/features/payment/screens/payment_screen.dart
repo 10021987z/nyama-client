@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../orders/data/orders_repository.dart';
@@ -36,9 +37,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ? userPhone
           : '+237 6XX XXX XXX',
     );
+    _loadAddress();
   }
 
-  // Adresse — pré-remplie. Brief : "Bonapriso, Douala / Appartement 4B"
+  Future<void> _loadAddress() async {
+    final city = await SecureStorage.getCity();
+    final quartier = await SecureStorage.getQuartier();
+    if (!mounted) return;
+    setState(() {
+      if (quartier != null && city != null) {
+        _address = '$quartier, $city';
+      } else if (quartier != null) {
+        _address = quartier;
+      }
+    });
+  }
+
+  // Adresse — pré-remplie depuis SecureStorage.
   String _address = 'Bonapriso, Douala';
   String _addressDetail = 'Appartement 4B';
 

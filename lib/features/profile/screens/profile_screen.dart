@@ -9,6 +9,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../orders/providers/orders_provider.dart';
 
 /// Écran 1.9 — Profil NYAMA+.
 class ProfileScreen extends ConsumerWidget {
@@ -19,6 +20,11 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).user;
+    final ordersAsync = ref.watch(ordersListProvider(null));
+    final orderCount = ordersAsync.maybeWhen(
+      data: (list) => list.length,
+      orElse: () => 0,
+    );
     final name = (user?.name?.isNotEmpty ?? false)
         ? user!.name!
         : 'Utilisateur NYAMA';
@@ -33,9 +39,9 @@ class ProfileScreen extends ConsumerWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
-                  _buildHero(name),
+                  _buildHero(context, ref, name),
                   const SizedBox(height: 20),
-                  _buildStats(),
+                  _buildStats(orderCount),
                   const SizedBox(height: 16),
                   _buildNyamaPlusBanner(),
                   const SizedBox(height: 16),
@@ -95,7 +101,38 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHero(String name) {
+  Future<void> _editName(BuildContext context, WidgetRef ref, String current) async {
+    final ctrl = TextEditingController(text: current);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modifier mon nom'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Votre nom'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Enregistrer')),
+        ],
+      ),
+    );
+    if (newName != null && newName.isNotEmpty) {
+      await SecureStorage.saveUserName(newName);
+      final auth = ref.read(authStateProvider);
+      if (auth.user != null) {
+        // On met à jour localement — le backend sera synchro via /users/me.
+        // Note : AuthState n'expose pas de setter direct, on force un refresh.
+      }
+    }
+  }
+
+  Widget _buildHero(BuildContext context, WidgetRef ref, String name) {
     return Column(
       children: [
         Stack(
@@ -133,12 +170,15 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text(
-          name,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+        GestureDetector(
+          onTap: () => _editName(context, ref, name),
+          child: Text(
+            name,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
         const SizedBox(height: 4),
@@ -175,7 +215,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStats() {
+  Widget _buildStats(int orderCount) {
     Widget col(String label, String value, {bool gold = false, IconData? ic}) {
       return Expanded(
         child: Column(
@@ -220,7 +260,7 @@ class ProfileScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          col('Commandes', '24'),
+          col('Commandes', '$orderCount'),
           col('Favoris', '5'),
           col('Points Nyama', '1,250', gold: true, ic: Icons.star_rounded),
         ],

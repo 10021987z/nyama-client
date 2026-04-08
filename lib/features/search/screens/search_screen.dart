@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
@@ -28,12 +29,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String? _error;
   String _activeFilter = 'Note';
 
-  static const _recentSearches = [
-    'Ndole',
-    'Grilled Fish',
-    'Douala BBQ',
-    'Eru & Waterfufu',
-  ];
+  List<String> _recentSearches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await SecureStorage.getSearchHistory();
+    if (!mounted) return;
+    setState(() => _recentSearches = history);
+  }
 
   @override
   void dispose() {
@@ -67,6 +75,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
 
     final repo = HomeRepository();
+    await SecureStorage.addSearchHistory(query);
+    final updated = await SecureStorage.getSearchHistory();
+    if (mounted) setState(() => _recentSearches = updated);
     try {
       final results = await Future.wait([
         repo.getMenuItems(search: query, limit: 10),
