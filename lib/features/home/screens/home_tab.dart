@@ -33,13 +33,31 @@ const _kCardShadow = [
 const _kHPad = 24.0;
 
 // ─── Mock data ─────────────────────────────────────────────────────────────
+const _kAllCategory = 'Tout';
 const _mockCategories = <String>[
+  _kAllCategory,
   'Plats traditionnels',
   'Grillades',
   'Beignets',
   'Poissons',
   'Boissons',
 ];
+
+// Mots-clés associés à chaque catégorie pour filtrer les plats
+const _categoryKeywords = <String, List<String>>{
+  'Plats traditionnels': ['ndolé', 'ndole', 'eru', 'koki'],
+  'Grillades': ['braisé', 'braise', 'poulet', 'grillade'],
+  'Beignets': ['beignet', 'accra'],
+  'Poissons': ['poisson', 'braisé', 'braise'],
+  'Boissons': ['jus', 'folere', 'foléré', 'boisson'],
+};
+
+bool _dishMatchesCategory(String dishName, String category) {
+  if (category == _kAllCategory) return true;
+  final keywords = _categoryKeywords[category] ?? const <String>[];
+  final n = dishName.toLowerCase();
+  return keywords.any((k) => n.contains(k));
+}
 
 class _MockRestaurant {
   final String name;
@@ -130,8 +148,28 @@ class HomeTab extends ConsumerStatefulWidget {
   ConsumerState<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends ConsumerState<HomeTab> {
-  String _activeCategory = _mockCategories.first;
+class _HomeTabState extends ConsumerState<HomeTab>
+    with SingleTickerProviderStateMixin {
+  String _activeCategory = _kAllCategory;
+  late final AnimationController _fadeCtrl;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+    _fadeCtrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,10 +180,15 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       data: (r) => r.data,
       orElse: () => const <Cook>[],
     );
-    final menu = menuAsync.maybeWhen(
+    final menuAll = menuAsync.maybeWhen(
       data: (r) => r.data,
       orElse: () => const <MenuItem>[],
     );
+    final menu = _activeCategory == _kAllCategory
+        ? menuAll
+        : menuAll
+            .where((m) => _dishMatchesCategory(m.name, _activeCategory))
+            .toList();
 
     return Scaffold(
       backgroundColor: _kCreme,
@@ -164,31 +207,34 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           ref.invalidate(filteredMenuItemsProvider);
           ref.invalidate(dailySpecialsProvider);
         },
-        child: ListView(
-          padding: const EdgeInsets.only(top: 8, bottom: 32),
-          children: [
-            const SizedBox(height: 8),
-            const _SearchBar(),
-            const SizedBox(height: 20),
-            const _DailyBanner(),
-            const SizedBox(height: 28),
-            const _SectionHeader(title: 'Catégories', action: 'Tout voir'),
-            const SizedBox(height: 12),
-            _CategoryChips(
-              active: _activeCategory,
-              onTap: (c) => setState(() => _activeCategory = c),
-            ),
-            const SizedBox(height: 28),
-            const _SectionHeader(title: 'Restaurants près de toi'),
-            const SizedBox(height: 12),
-            _RestaurantsRow(cooks: cooks),
-            const SizedBox(height: 28),
-            const _SectionHeader(
-                title: 'Plats populaires',
-                action: 'Le goût de chez nous'),
-            const SizedBox(height: 16),
-            _PopularGrid(items: menu),
-          ],
+        child: FadeTransition(
+          opacity: _fade,
+          child: ListView(
+            padding: const EdgeInsets.only(top: 8, bottom: 32),
+            children: [
+              const SizedBox(height: 8),
+              const _SearchBar(),
+              const SizedBox(height: 20),
+              const _DailyBanner(),
+              const SizedBox(height: 28),
+              const _SectionHeader(title: 'Catégories', action: 'Tout voir'),
+              const SizedBox(height: 12),
+              _CategoryChips(
+                active: _activeCategory,
+                onTap: (c) => setState(() => _activeCategory = c),
+              ),
+              const SizedBox(height: 28),
+              const _SectionHeader(title: 'Restaurants près de toi'),
+              const SizedBox(height: 12),
+              _RestaurantsRow(cooks: cooks),
+              const SizedBox(height: 28),
+              const _SectionHeader(
+                  title: 'Plats populaires',
+                  action: 'Le goût de chez nous'),
+              const SizedBox(height: 16),
+              _PopularGrid(items: menu, activeCategory: _activeCategory),
+            ],
+          ),
         ),
       ),
     );
@@ -288,16 +334,26 @@ class _Header extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _kWhite,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: _kCardShadow,
+                  GestureDetector(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Pas de nouvelles notifications'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _kWhite,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: _kCardShadow,
+                      ),
+                      child: const Icon(Icons.notifications_none_rounded,
+                          color: _kCharcoal, size: 22),
                     ),
-                    child: const Icon(Icons.notifications_none_rounded,
-                        color: _kCharcoal, size: 22),
                   ),
                   Positioned(
                     top: 0,
@@ -369,7 +425,10 @@ class _DailyBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: _kHPad),
-      child: Container(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.push('/search'),
+        child: Container(
         height: 192,
         width: double.infinity,
         clipBehavior: Clip.antiAlias,
@@ -456,6 +515,7 @@ class _DailyBanner extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -573,6 +633,7 @@ class _RestaurantsRow extends StatelessWidget {
           if (useMock) {
             final m = _mockRestaurants[i];
             return _RestaurantCard(
+              id: 'restaurant-${i + 1}',
               name: m.name,
               area: m.area,
               rating: m.rating,
@@ -584,6 +645,7 @@ class _RestaurantsRow extends StatelessWidget {
           final c = cooks[i];
           final m = _mockRestaurants[i % _mockRestaurants.length];
           return _RestaurantCard(
+            id: c.id,
             name: c.displayName,
             area: c.quarter != null
                 ? '${c.quarter!.name}, ${c.quarter!.city}'
@@ -600,6 +662,7 @@ class _RestaurantsRow extends StatelessWidget {
 }
 
 class _RestaurantCard extends StatelessWidget {
+  final String id;
   final String name;
   final String area;
   final double rating;
@@ -607,6 +670,7 @@ class _RestaurantCard extends StatelessWidget {
   final List<Color> gradient;
   final String imageAsset;
   const _RestaurantCard({
+    required this.id,
     required this.name,
     required this.area,
     required this.rating,
@@ -617,14 +681,20 @@ class _RestaurantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 256,
-      decoration: BoxDecoration(
-        color: _kWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: _kCardShadow,
-      ),
-      child: Column(
+    return Material(
+      color: _kWhite,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        width: 256,
+        decoration: BoxDecoration(
+          color: _kWhite,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _kCardShadow,
+        ),
+        child: InkWell(
+          onTap: () => context.push('/restaurant/$id'),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
@@ -732,6 +802,8 @@ class _RestaurantCard extends StatelessWidget {
           ),
         ],
       ),
+        ),
+      ),
     );
   }
 }
@@ -739,12 +811,47 @@ class _RestaurantCard extends StatelessWidget {
 // ─── Popular grid ──────────────────────────────────────────────────────────
 class _PopularGrid extends ConsumerWidget {
   final List<MenuItem> items;
-  const _PopularGrid({required this.items});
+  final String activeCategory;
+  const _PopularGrid({required this.items, required this.activeCategory});
+
+  void _showAddedSnack(BuildContext context, String name) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: _kWhite, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text('$name ajouté au panier !')),
+            ],
+          ),
+          backgroundColor: _kForest,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final useMock = items.isEmpty;
-    final count = useMock ? _mockDishes.length : items.length;
+    final mockFiltered = _mockDishes
+        .where((d) => _dishMatchesCategory(d.name, activeCategory))
+        .toList();
+    final count = useMock ? mockFiltered.length : items.length;
+
+    if (count == 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _kHPad, vertical: 24),
+        child: Center(
+          child: Text(
+            'Aucun plat dans cette catégorie',
+            style: TextStyle(color: _kMuted.withValues(alpha: 0.8)),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: _kHPad),
@@ -760,41 +867,53 @@ class _PopularGrid extends ConsumerWidget {
         ),
         itemBuilder: (_, i) {
           if (useMock) {
-            final m = _mockDishes[i];
+            final m = mockFiltered[i];
+            const cookId = 'restaurant-1';
             return _DishCard(
               name: m.name,
               priceXaf: m.price,
               gradient: m.gradient,
               imageAsset: m.image,
-              onAdd: () => ref.read(cartProvider.notifier).addItem(
-                    CartItem(
-                      menuItemId: 'mock-$i',
-                      name: m.name,
-                      priceXaf: m.price,
-                      quantity: 1,
-                      cookId: 'mock-cook',
-                      cookName: 'Maman Catherine',
-                    ),
-                  ),
+              onTap: () => context.push('/restaurant/$cookId'),
+              onAdd: () {
+                ref.read(cartProvider.notifier).addItem(
+                      CartItem(
+                        menuItemId: 'mock-${m.name}',
+                        name: m.name,
+                        priceXaf: m.price,
+                        quantity: 1,
+                        cookId: cookId,
+                        cookName: 'Maman Catherine',
+                      ),
+                    );
+                _showAddedSnack(context, m.name);
+              },
             );
           }
           final it = items[i];
+          final cookId = it.cook?.id ?? '';
           return _DishCard(
             name: it.name,
             priceXaf: it.priceXaf,
             gradient: _dishGradients[i % _dishGradients.length],
             imageAsset: _mockDishes[i % _mockDishes.length].image,
-            onAdd: () => ref.read(cartProvider.notifier).addItem(
-                  CartItem(
-                    menuItemId: it.id,
-                    name: it.name,
-                    priceXaf: it.priceXaf,
-                    quantity: 1,
-                    cookId: it.cook?.id ?? '',
-                    cookName: it.cook?.displayName ?? '',
-                    imageUrl: it.imageUrl,
-                  ),
-                ),
+            onTap: cookId.isEmpty
+                ? null
+                : () => context.push('/restaurant/$cookId'),
+            onAdd: () {
+              ref.read(cartProvider.notifier).addItem(
+                    CartItem(
+                      menuItemId: it.id,
+                      name: it.name,
+                      priceXaf: it.priceXaf,
+                      quantity: 1,
+                      cookId: cookId,
+                      cookName: it.cook?.displayName ?? '',
+                      imageUrl: it.imageUrl,
+                    ),
+                  );
+              _showAddedSnack(context, it.name);
+            },
           );
         },
       ),
@@ -808,24 +927,33 @@ class _DishCard extends StatelessWidget {
   final List<Color> gradient;
   final String imageAsset;
   final VoidCallback onAdd;
+  final VoidCallback? onTap;
   const _DishCard({
     required this.name,
     required this.priceXaf,
     required this.gradient,
     required this.imageAsset,
     required this.onAdd,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: _kCardShadow,
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Column(
+    return Material(
+      color: _kWhite,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: _kWhite,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _kCardShadow,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AspectRatio(
@@ -843,25 +971,7 @@ class _DishCard extends StatelessWidget {
                 Positioned(
                   right: 8,
                   bottom: 8,
-                  child: GestureDetector(
-                    onTap: onAdd,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: _kForest,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.add, color: _kWhite, size: 18),
-                    ),
-                  ),
+                  child: _AddButton(onAdd: onAdd),
                 ),
               ],
             ),
@@ -894,6 +1004,57 @@ class _DishCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Add button (scale on press) ───────────────────────────────────────────
+class _AddButton extends StatefulWidget {
+  final VoidCallback onAdd;
+  const _AddButton({required this.onAdd});
+
+  @override
+  State<_AddButton> createState() => _AddButtonState();
+}
+
+class _AddButtonState extends State<_AddButton> {
+  double _scale = 1.0;
+
+  void _down(_) => setState(() => _scale = 0.9);
+  void _up(_) => setState(() => _scale = 1.0);
+  void _cancel() => setState(() => _scale = 1.0);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onAdd,
+      onTapDown: _down,
+      onTapUp: _up,
+      onTapCancel: _cancel,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: _kForest,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.add, color: _kWhite, size: 18),
+        ),
       ),
     );
   }
