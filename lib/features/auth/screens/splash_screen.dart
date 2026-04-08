@@ -214,7 +214,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   );
                 },
                 child: Text(
-                  'L\'EXCELLENCE CULINAIRE',
+                  'VOS PLATS PRÉFÉRÉS LIVRÉS CHEZ VOUS',
                   style: TextStyle(
                     fontSize: 12,
                     letterSpacing: 3.6, // ≈ 0.3em
