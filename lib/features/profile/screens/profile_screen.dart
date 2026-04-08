@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -135,40 +138,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget _buildHero(BuildContext context, WidgetRef ref, String name) {
     return Column(
       children: [
-        Stack(
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary, width: 2),
-              ),
-              child: const CircleAvatar(
-                backgroundColor: AppColors.primary,
-                backgroundImage:
-                    AssetImage('assets/images/mock/logo_nyama.jpg'),
-              ),
-            ),
-            Positioned(
-              right: 4,
-              bottom: 4,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
+        const _ProfileAvatar(),
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () => _editName(context, ref, name),
@@ -856,6 +826,94 @@ class _MenuCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Avatar stateful (image_picker) ─────────────────────────────────────
+
+class _ProfileAvatar extends StatefulWidget {
+  const _ProfileAvatar();
+
+  @override
+  State<_ProfileAvatar> createState() => _ProfileAvatarState();
+}
+
+class _ProfileAvatarState extends State<_ProfileAvatar> {
+  String? _path;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final p = await SecureStorage.getAvatarPath();
+    if (!mounted) return;
+    setState(() => _path = p);
+  }
+
+  Future<void> _pick() async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 800,
+      );
+      if (file == null) return;
+      await SecureStorage.saveAvatarPath(file.path);
+      if (!mounted) return;
+      setState(() => _path = file.path);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossible de charger la photo : $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFile = _path != null && File(_path!).existsSync();
+    return GestureDetector(
+      onTap: _pick,
+      child: Stack(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary, width: 2),
+            ),
+            child: CircleAvatar(
+              backgroundColor: AppColors.primary,
+              backgroundImage: hasFile
+                  ? FileImage(File(_path!)) as ImageProvider
+                  : const AssetImage('assets/images/mock/logo_nyama.jpg'),
+            ),
+          ),
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                size: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -63,13 +63,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (!mounted) return;
 
     if (loggedIn) {
-      // Tente de reconstruire l'utilisateur depuis le stockage
+      // Reconstruit l'utilisateur depuis le stockage local
       final phone = await SecureStorage.getUserPhone();
       final id = await SecureStorage.getUserId();
-      final user = (phone != null && id != null)
-          ? AppUser(id: id, phone: phone)
+      final localName = await SecureStorage.getUserName();
+      var user = (phone != null && id != null)
+          ? AppUser(id: id, phone: phone, name: localName)
           : null;
       state = AuthState(status: AuthStatus.authenticated, user: user);
+
+      // Puis tente de rafraîchir depuis l'API GET /users/me (non bloquant)
+      try {
+        final remote = await _repo.getProfile();
+        if (!mounted) return;
+        if (remote != null) {
+          state = AuthState(
+            status: AuthStatus.authenticated,
+            user: remote.copyWith(name: remote.name ?? localName),
+          );
+          if (remote.name != null && remote.name!.isNotEmpty) {
+            await SecureStorage.saveUserName(remote.name!);
+          }
+        }
+      } catch (_) {
+        // Si la vérif échoue (401 → interceptor logout, ou offline), on ignore
+      }
     } else {
       state = const AuthState(status: AuthStatus.unauthenticated);
     }

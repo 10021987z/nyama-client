@@ -90,6 +90,20 @@ class AuthRepository {
 
   /// Vérifie si un access token existe en stockage (session active)
   Future<bool> isLoggedIn() => SecureStorage.isLoggedIn();
+
+  /// Récupère le profil utilisateur depuis l'API (GET /users/me)
+  Future<AppUser?> getProfile() async {
+    try {
+      final response = await _dio.get(ApiConstants.profile);
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        return AppUser.fromJson(data);
+      }
+      return null;
+    } on DioException catch (e) {
+      throw ApiExceptionHandler.handle(e);
+    }
+  }
 }
 
 // ─── Modèles ───────────────────────────────────────────────────────────────

@@ -69,7 +69,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Future<void> _search(String query) async {
     if (!mounted) return;
+    if (_controller.text != query) {
+      _controller.text = query;
+      _controller.selection =
+          TextSelection.collapsed(offset: query.length);
+    }
     setState(() {
+      _query = query;
       _isLoading = true;
       _error = null;
     });
@@ -308,12 +314,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   color: AppColors.onSurface,
                 ),
               ),
-              Text(
-                'Voir la Carte',
-                style: TextStyle(fontFamily: 'NunitoSans',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryVibrant,
+              GestureDetector(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vue carte bientôt disponible'),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Voir la Carte',
+                  style: TextStyle(fontFamily: 'NunitoSans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryVibrant,
+                  ),
                 ),
               ),
             ],
@@ -325,6 +340,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: _RegionCard(
                   label: 'Littoral',
                   color: AppColors.primary,
+                  onTap: () => _search('Littoral'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -332,6 +348,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: _RegionCard(
                   label: 'Centre',
                   color: AppColors.terracotta,
+                  onTap: () => _search('Centre'),
                 ),
               ),
             ],
@@ -357,26 +374,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
             childAspectRatio: 1.4,
-            children: const [
+            children: [
               _CategoryCard(
                 label: 'Grillades',
                 subtitle: 'Fumé & Savoureux',
-                color: Color(0xFF8B4513),
+                color: const Color(0xFF8B4513),
+                onTap: () => _search('Grillades'),
               ),
               _CategoryCard(
                 label: 'Ragouts Traditionnels',
                 subtitle: '',
-                color: Color(0xFF2E7D32),
+                color: const Color(0xFF2E7D32),
+                onTap: () => _search('Ragouts'),
               ),
               _CategoryCard(
                 label: 'Restauration Rapide',
                 subtitle: '',
-                color: Color(0xFFE65100),
+                color: const Color(0xFFE65100),
+                onTap: () => _search('Rapide'),
               ),
               _CategoryCard(
                 label: 'Desserts',
                 subtitle: 'Sucré & Fruité',
-                color: Color(0xFF6A1B9A),
+                color: const Color(0xFF6A1B9A),
+                onTap: () => _search('Desserts'),
               ),
             ],
           ),
@@ -476,12 +497,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 class _RegionCard extends StatelessWidget {
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _RegionCard({required this.label, required this.color});
+  const _RegionCard({required this.label, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       height: 100,
       decoration: BoxDecoration(
         color: color,
@@ -519,6 +543,7 @@ class _RegionCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -529,16 +554,20 @@ class _CategoryCard extends StatelessWidget {
   final String label;
   final String subtitle;
   final Color color;
+  final VoidCallback? onTap;
 
   const _CategoryCard({
     required this.label,
     required this.subtitle,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(20),
@@ -589,6 +618,7 @@ class _CategoryCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

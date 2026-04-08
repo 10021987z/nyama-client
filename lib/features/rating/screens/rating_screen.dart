@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../orders/data/orders_repository.dart';
 
 /// Écran 1.8 — Notation post-livraison NYAMA.
-class RatingScreen extends StatefulWidget {
+class RatingScreen extends ConsumerStatefulWidget {
   final String orderId;
   const RatingScreen({super.key, required this.orderId});
 
   @override
-  State<RatingScreen> createState() => _RatingScreenState();
+  ConsumerState<RatingScreen> createState() => _RatingScreenState();
 }
 
-class _RatingScreenState extends State<RatingScreen> {
+class _RatingScreenState extends ConsumerState<RatingScreen> {
+  bool _submitting = false;
   static const Color _waGreen = Color(0xFF25D366);
   static const List<String> _ratingLabels = [
     'Bof',
@@ -49,14 +52,39 @@ class _RatingScreenState extends State<RatingScreen> {
     });
   }
 
-  void _submit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Merci pour votre avis !')),
-    );
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/orders');
+  Future<void> _submit() async {
+    if (_foodRating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Merci de noter la cuisine.')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await OrdersRepository().createReview(
+        orderId: widget.orderId,
+        cookRating: _foodRating.toDouble(),
+        riderRating: _riderRating > 0 ? _riderRating.toDouble() : null,
+        cookComment: _commentCtrl.text.trim().isEmpty
+            ? (_selectedTags.isEmpty ? null : _selectedTags.join(', '))
+            : '${_commentCtrl.text.trim()}${_selectedTags.isEmpty ? '' : ' — ${_selectedTags.join(', ')}'}',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Merci pour votre avis !')),
+      );
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/orders');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -451,7 +479,7 @@ class _RatingScreenState extends State<RatingScreen> {
       height: 56,
       child: ElevatedButton(
         key: const Key('rating_submit_button'),
-        onPressed: _foodRating > 0 ? _submit : null,
+        onPressed: (_foodRating > 0 && !_submitting) ? _submit : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.forestGreen,
           foregroundColor: Colors.white,
@@ -461,17 +489,27 @@ class _RatingScreenState extends State<RatingScreen> {
             borderRadius: BorderRadius.circular(14),
           ),
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Envoyer mon avis',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            SizedBox(width: 8),
-            Icon(Icons.play_arrow_rounded, size: 20),
-          ],
-        ),
+        child: _submitting
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Envoyer mon avis',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Icons.play_arrow_rounded, size: 20),
+                ],
+              ),
       ),
     );
   }
