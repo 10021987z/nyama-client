@@ -1,8 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
+
+class _Quartier {
+  final String name;
+  final String city;
+  const _Quartier(this.name, this.city);
+}
+
+const _kAllQuartiers = <_Quartier>[
+  _Quartier('Akwa', 'Douala 1er'),
+  _Quartier('Bonapriso', 'Douala 1er'),
+  _Quartier('Deido', 'Douala 1er'),
+  _Quartier('Bonanjo', 'Douala 1er'),
+  _Quartier('Bastos', 'Yaoundé'),
+  _Quartier('Bali', 'Douala 1er'),
+  _Quartier('Ndokotti', 'Douala 3e'),
+  _Quartier('New Bell', 'Douala 2e'),
+];
+
+const _kPopular = <_Quartier>[
+  _Quartier('Akwa', 'Douala 1er'),
+  _Quartier('Bonapriso', 'Douala 1er'),
+  _Quartier('Deido', 'Douala 1er'),
+  _Quartier('Bastos', 'Yaoundé'),
+  _Quartier('Bonanjo', 'Douala 1er'),
+  _Quartier('Ndokotti', 'Douala 3e'),
+];
 
 class QuartierSelectionScreen extends StatefulWidget {
   const QuartierSelectionScreen({super.key});
@@ -12,286 +40,443 @@ class QuartierSelectionScreen extends StatefulWidget {
       _QuartierSelectionScreenState();
 }
 
-class _Quartier {
-  final String name;
-  final String area;
-  const _Quartier(this.name, this.area);
-}
+class _QuartierSelectionScreenState extends State<QuartierSelectionScreen>
+    with SingleTickerProviderStateMixin {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  bool _locating = false;
+  late final AnimationController _pulseCtrl;
 
-class _QuartierSelectionScreenState extends State<QuartierSelectionScreen> {
-  static const _cities = ['Douala', 'Yaoundé', 'Kribi'];
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() {
+      if (_searchCtrl.text != _query) {
+        setState(() => _query = _searchCtrl.text);
+      }
+    });
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
 
-  static const Map<String, List<_Quartier>> _byCity = {
-    'Douala': [
-      _Quartier('Akwa', 'Douala 1er'),
-      _Quartier('Bonapriso', 'Douala 1er'),
-      _Quartier('Deido', 'Douala 1er'),
-      _Quartier('Bonanjo', 'Douala 1er'),
-      _Quartier('Ndokotti', 'Douala 3e'),
-      _Quartier('Bali', 'Douala 1er'),
-      _Quartier('Bonaberi', 'Douala 4e'),
-      _Quartier('New Bell', 'Douala 2e'),
-    ],
-    'Yaoundé': [
-      _Quartier('Bastos', 'Yaoundé 1er'),
-      _Quartier('Mvan', 'Yaoundé 3e'),
-      _Quartier('Biyem-Assi', 'Yaoundé 6e'),
-      _Quartier('Nsimeyong', 'Yaoundé 3e'),
-      _Quartier('Mimboman', 'Yaoundé 4e'),
-      _Quartier('Essos', 'Yaoundé 4e'),
-    ],
-    'Kribi': [
-      _Quartier('Centre-ville', 'Kribi'),
-      _Quartier('Afan-Mabe', 'Kribi'),
-    ],
-  };
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
 
-  String _city = 'Douala';
-  String? _quartier;
-
-  Future<void> _confirm() async {
-    if (_quartier == null) return;
-    await SecureStorage.saveQuartier(_city, _quartier!);
+  Future<void> _pick(_Quartier q) async {
+    await SecureStorage.saveQuartier(q.city, q.name);
     if (!mounted) return;
     context.go('/home');
   }
 
+  Future<void> _useCurrentLocation() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showError('Service de localisation désactivé');
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        _showError('Permission GPS refusée');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      final q = _reverseGeocode(pos.latitude, pos.longitude);
+      await SecureStorage.saveQuartier(q.city, q.name);
+      if (!mounted) return;
+      context.go('/home');
+    } catch (_) {
+      _showError('Impossible de récupérer la position');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  // Géocodage inversé simplifié — retourne le quartier le plus proche
+  // de quelques points connus de Douala/Yaoundé.
+  _Quartier _reverseGeocode(double lat, double lng) {
+    const anchors = <(_Quartier, double, double)>[
+      (_Quartier('Akwa', 'Douala 1er'), 4.0486, 9.7679),
+      (_Quartier('Bonapriso', 'Douala 1er'), 4.0383, 9.6927),
+      (_Quartier('Deido', 'Douala 1er'), 4.0681, 9.7036),
+      (_Quartier('Bonanjo', 'Douala 1er'), 4.0500, 9.6900),
+      (_Quartier('Ndokotti', 'Douala 3e'), 4.0578, 9.7300),
+      (_Quartier('Bastos', 'Yaoundé'), 3.8900, 11.5130),
+    ];
+    _Quartier best = anchors.first.$1;
+    double bestD = double.infinity;
+    for (final a in anchors) {
+      final dLat = a.$2 - lat;
+      final dLng = a.$3 - lng;
+      final d = dLat * dLat + dLng * dLng;
+      if (d < bestD) {
+        bestD = d;
+        best = a.$1;
+      }
+    }
+    return best;
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
+  List<_Quartier> get _suggestions {
+    if (_query.trim().isEmpty) return const [];
+    final q = _query.toLowerCase();
+    return _kAllQuartiers
+        .where((e) =>
+            e.name.toLowerCase().contains(q) ||
+            e.city.toLowerCase().contains(q))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final quartiers = _byCity[_city] ?? const [];
+    final suggestions = _suggestions;
 
     return Scaffold(
       backgroundColor: AppColors.creme,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Top bar ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => context.go('/onboarding/otp'),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: AppColors.surfaceLow,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.arrow_back,
-                          color: AppColors.charcoal, size: 20),
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-            ),
+            _buildHeader(),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.location_on,
-                            size: 56, color: Colors.white),
-                      ),
-                    ),
+                    _buildSearchBar(),
+                    if (suggestions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _buildSuggestions(suggestions),
+                    ],
+                    const SizedBox(height: 16),
+                    _buildGpsButton(),
                     const SizedBox(height: 24),
-                    Center(
-                      child: Text(
-                        'Ton quartier',
-                        style: TextStyle(
-                          fontFamily: AppTheme.headlineFamily,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.charcoal,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Center(
-                      child: Text(
-                        'On livre où exactement ?',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // ── City selector ─────────────────────────────
-                    Row(
-                      children: _cities.map((c) {
-                        final active = c == _city;
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() {
-                              _city = c;
-                              _quartier = null;
-                            }),
-                            child: Container(
-                              margin: EdgeInsets.only(
-                                  right: c == _cities.last ? 0 : 8),
-                              height: 44,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? AppColors.primary
-                                    : AppColors.surfaceLow,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                c,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: active
-                                      ? Colors.white
-                                      : AppColors.charcoal,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                    _buildSeparator(),
                     const SizedBox(height: 20),
-
-                    // ── Grid quartiers ────────────────────────────
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: quartiers.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.55,
+                    const Text(
+                      'Quartiers populaires',
+                      style: TextStyle(
+                        fontFamily: AppTheme.headlineFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.charcoal,
                       ),
-                      itemBuilder: (_, i) {
-                        final q = quartiers[i];
-                        final selected = q.name == _quartier;
-                        return GestureDetector(
-                          onTap: () => setState(() => _quartier = q.name),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: selected
-                                    ? AppColors.primary
-                                    : Colors.transparent,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.03),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              children: [
-                                Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Icon(Icons.home_filled,
-                                        color: AppColors.primary, size: 22),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          q.name,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.charcoal,
-                                          ),
-                                        ),
-                                        Text(
-                                          q.area,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                if (selected)
-                                  const Positioned(
-                                    top: 0,
-                                    right: 0,
-                                    child: Icon(Icons.check_circle,
-                                        color: AppColors.primary, size: 20),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
+                    ..._kPopular.map(_buildQuartierTile),
                   ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // ── CTA ──────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _quartier == null ? null : _confirm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.forestGreen,
-                    disabledBackgroundColor:
-                        AppColors.forestGreen.withValues(alpha: 0.4),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "C'est parti !",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward, size: 20),
-                    ],
-                  ),
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: GestureDetector(
+              onTap: () => context.canPop()
+                  ? context.pop()
+                  : context.go('/onboarding/otp'),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: AppColors.surfaceLow,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back,
+                    color: AppColors.charcoal, size: 20),
+              ),
+            ),
+          ),
+          const Text(
+            'Adresse de livraison',
+            style: TextStyle(
+              fontFamily: AppTheme.headlineFamily,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.charcoal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          const Icon(Icons.search,
+              color: AppColors.textSecondary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.charcoal,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isCollapsed: true,
+                hintText: 'Rechercher une adresse, un quartier...',
+                hintStyle: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textTertiary,
                 ),
               ),
             ),
+          ),
+          if (_query.isNotEmpty)
+            GestureDetector(
+              onTap: () => _searchCtrl.clear(),
+              child: const Icon(Icons.close,
+                  color: AppColors.textSecondary, size: 20),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestions(List<_Quartier> items) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _pick(items[i]),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on,
+                        color: AppColors.textSecondary, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.charcoal,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: items[i].name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '  ${items[i].city}',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right,
+                        color: AppColors.textTertiary, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            if (i < items.length - 1)
+              const Divider(height: 1, color: AppColors.surfaceLow),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGpsButton() {
+    return GestureDetector(
+      onTap: _useCurrentLocation,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: _locating
+                  ? const CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primary),
+                    )
+                  : ScaleTransition(
+                      scale: Tween<double>(begin: 0.9, end: 1.1).animate(
+                        CurvedAnimation(
+                          parent: _pulseCtrl,
+                          curve: Curves.easeInOut,
+                        ),
+                      ),
+                      child: const Icon(Icons.my_location,
+                          color: AppColors.primary, size: 24),
+                    ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Utiliser ma position actuelle',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.charcoal,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Via GPS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeparator() {
+    return Row(
+      children: const [
+        Expanded(child: Divider(color: AppColors.surfaceLow, thickness: 1)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'ou choisir un quartier',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: AppColors.surfaceLow, thickness: 1)),
+      ],
+    );
+  }
+
+  Widget _buildQuartierTile(_Quartier q) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _pick(q),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.location_on,
+                      color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        q.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.charcoal,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        q.city,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right,
+                    color: AppColors.textTertiary, size: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );

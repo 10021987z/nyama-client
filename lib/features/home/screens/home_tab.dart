@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/models/cook.dart';
@@ -234,12 +235,12 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
+                    const Text(
                       'Bonjour Arthur 👋',
                       style: TextStyle(
                         fontFamily: 'Montserrat',
@@ -249,19 +250,38 @@ class _Header extends StatelessWidget {
                         height: 1.2,
                       ),
                     ),
-                    SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, color: _kOrange, size: 14),
-                        SizedBox(width: 2),
-                        Text(
-                          'Douala, Akwa',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _kMuted,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 2),
+                    FutureBuilder<List<String?>>(
+                      future: Future.wait([
+                        SecureStorage.getCity(),
+                        SecureStorage.getQuartier(),
+                      ]),
+                      builder: (context, snap) {
+                        final data = snap.data;
+                        final city = data?[0];
+                        final quartier = data?[1];
+                        final hasLoc =
+                            quartier != null && quartier.isNotEmpty;
+                        final label = hasLoc
+                            ? (city != null && city.isNotEmpty
+                                ? '$city, $quartier'
+                                : quartier)
+                            : 'Localisation...';
+                        return Row(
+                          children: [
+                            const Icon(Icons.location_on,
+                                color: _kOrange, size: 14),
+                            const SizedBox(width: 2),
+                            Text(
+                              label,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: _kMuted,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

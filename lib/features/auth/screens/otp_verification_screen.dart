@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
@@ -148,7 +149,14 @@ class _OtpVerificationScreenState
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authStateProvider, (prev, next) {
       if (next.status == AuthStatus.authenticated) {
-        context.go('/onboarding/quartier');
+        SecureStorage.getQuartier().then((q) {
+          if (!context.mounted) return;
+          if (q != null && q.isNotEmpty) {
+            context.go('/home');
+          } else {
+            context.go('/onboarding/quartier');
+          }
+        });
       }
     });
 
