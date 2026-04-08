@@ -47,30 +47,73 @@ class _MockRestaurant {
   final double rating;
   final String eta;
   final List<Color> gradient;
+  final String image;
   const _MockRestaurant(
-      this.name, this.area, this.rating, this.eta, this.gradient);
+      this.name, this.area, this.rating, this.eta, this.gradient, this.image);
 }
 
 const _mockRestaurants = <_MockRestaurant>[
-  _MockRestaurant('Maman Catherine', 'Akwa, Douala', 4.8, '25-35 min',
-      [Color(0xFFF57C20), Color(0xFFD4A017)]),
-  _MockRestaurant('Le Grilladin d\'Akwa', 'Bali, Douala', 4.5, '30-40 min',
-      [Color(0xFF1B4332), Color(0xFF2A9D8F)]),
+  _MockRestaurant(
+    'Maman Catherine',
+    'Akwa, Douala',
+    4.8,
+    '25-35 min',
+    [Color(0xFFF57C20), Color(0xFFD4A017)],
+    'assets/images/mock/plats_camerounais.jpg',
+  ),
+  _MockRestaurant(
+    'Le Grilladin d\'Akwa',
+    'Bali, Douala',
+    4.5,
+    '30-40 min',
+    [Color(0xFF1B4332), Color(0xFF2A9D8F)],
+    'assets/images/mock/grillades_mix.jpg',
+  ),
 ];
 
 class _MockDish {
   final String name;
   final int price;
   final List<Color> gradient;
-  const _MockDish(this.name, this.price, this.gradient);
+  final String image;
+  const _MockDish(this.name, this.price, this.gradient, this.image);
 }
 
 const _mockDishes = <_MockDish>[
-  _MockDish('Ndolé Viande', 2500, [Color(0xFF8B4513), Color(0xFFD2691E)]),
-  _MockDish('Poisson Braisé', 4000, [Color(0xFF2F4F4F), Color(0xFF5F9EA0)]),
-  _MockDish('Beignets Haricot', 1000, [Color(0xFFDAA520), Color(0xFFF4A460)]),
-  _MockDish('Salade Mixte', 1500, [Color(0xFF2E8B57), Color(0xFF66CDAA)]),
+  _MockDish('Ndolé Viande', 2500, [Color(0xFF8B4513), Color(0xFFD2691E)],
+      'assets/images/mock/ndole.jpg'),
+  _MockDish('Poisson Braisé', 4000, [Color(0xFF2F4F4F), Color(0xFF5F9EA0)],
+      'assets/images/mock/poisson_braise.jpg'),
+  _MockDish('Beignets Haricot', 1000, [Color(0xFFDAA520), Color(0xFFF4A460)],
+      'assets/images/mock/beignets.jpg'),
+  _MockDish('Salade Mixte', 1500, [Color(0xFF2E8B57), Color(0xFF66CDAA)],
+      'assets/images/mock/salade.jpg'),
 ];
+
+// ─── Image with gradient fallback ──────────────────────────────────────────
+class _AssetWithFallback extends StatelessWidget {
+  final String assetPath;
+  final List<Color> gradient;
+  const _AssetWithFallback({required this.assetPath, required this.gradient});
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+    );
+    return Image.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+}
 
 const _dishGradients = <List<Color>>[
   [Color(0xFF8B4513), Color(0xFFD2691E)],
@@ -173,14 +216,20 @@ class _Header extends StatelessWidget {
                   color: _kOrange,
                   shape: BoxShape.circle,
                 ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'A',
-                  style: TextStyle(
-                    fontFamily: 'Montserrat',
-                    color: _kWhite,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/images/mock/logo_nyama.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Text(
+                      'A',
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        color: _kWhite,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -316,6 +365,10 @@ class _DailyBanner extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            const _AssetWithFallback(
+              assetPath: 'assets/images/mock/grillades_mix.jpg',
+              gradient: [_kOrange, _kOrangeDeep],
+            ),
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -506,9 +559,11 @@ class _RestaurantsRow extends StatelessWidget {
               rating: m.rating,
               eta: m.eta,
               gradient: m.gradient,
+              imageAsset: m.image,
             );
           }
           final c = cooks[i];
+          final m = _mockRestaurants[i % _mockRestaurants.length];
           return _RestaurantCard(
             name: c.displayName,
             area: c.quarter != null
@@ -516,7 +571,8 @@ class _RestaurantsRow extends StatelessWidget {
                 : (c.landmark ?? 'Douala'),
             rating: c.avgRating,
             eta: '25-35 min',
-            gradient: _mockRestaurants[i % _mockRestaurants.length].gradient,
+            gradient: m.gradient,
+            imageAsset: m.image,
           );
         },
       ),
@@ -530,12 +586,14 @@ class _RestaurantCard extends StatelessWidget {
   final double rating;
   final String eta;
   final List<Color> gradient;
+  final String imageAsset;
   const _RestaurantCard({
     required this.name,
     required this.area,
     required this.rating,
     required this.eta,
     required this.gradient,
+    required this.imageAsset,
   });
 
   @override
@@ -552,21 +610,17 @@ class _RestaurantCard extends StatelessWidget {
         children: [
           Stack(
             children: [
-              Container(
-                height: 144,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  gradient: LinearGradient(
-                    colors: gradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: SizedBox(
+                  height: 144,
+                  width: double.infinity,
+                  child: _AssetWithFallback(
+                    assetPath: imageAsset,
+                    gradient: gradient,
                   ),
                 ),
-                alignment: Alignment.center,
-                child: Icon(Icons.restaurant,
-                    color: _kWhite.withValues(alpha: 0.3), size: 48),
               ),
               Positioned(
                 top: 8,
@@ -692,6 +746,7 @@ class _PopularGrid extends ConsumerWidget {
               name: m.name,
               priceXaf: m.price,
               gradient: m.gradient,
+              imageAsset: m.image,
               onAdd: () => ref.read(cartProvider.notifier).addItem(
                     CartItem(
                       menuItemId: 'mock-$i',
@@ -709,6 +764,7 @@ class _PopularGrid extends ConsumerWidget {
             name: it.name,
             priceXaf: it.priceXaf,
             gradient: _dishGradients[i % _dishGradients.length],
+            imageAsset: _mockDishes[i % _mockDishes.length].image,
             onAdd: () => ref.read(cartProvider.notifier).addItem(
                   CartItem(
                     menuItemId: it.id,
@@ -731,11 +787,13 @@ class _DishCard extends StatelessWidget {
   final String name;
   final int priceXaf;
   final List<Color> gradient;
+  final String imageAsset;
   final VoidCallback onAdd;
   const _DishCard({
     required this.name,
     required this.priceXaf,
     required this.gradient,
+    required this.imageAsset,
     required this.onAdd,
   });
 
@@ -756,18 +814,12 @@ class _DishCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: _AssetWithFallback(
+                    assetPath: imageAsset,
+                    gradient: gradient,
                   ),
-                  alignment: Alignment.center,
-                  child: Icon(Icons.restaurant,
-                      color: _kWhite.withValues(alpha: 0.4), size: 40),
                 ),
                 Positioned(
                   right: 8,
