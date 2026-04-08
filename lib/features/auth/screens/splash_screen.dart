@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
@@ -15,27 +18,110 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _bell;
-  late final Animation<double> _translateY;
-  late final Animation<double> _scale;
+  late final AnimationController _controller;
+
+  // Phase 1 — apparition (0 → 400ms => 0.0 → 0.16)
+  late final Animation<double> _logoScale;
+  late final Animation<double> _logoOpacity;
+
+  // Phase 2 — smile bounce (400 → 800ms => 0.16 → 0.32)
+  late final Animation<double> _bounceY;
+  late final Animation<double> _bouncePulse;
+
+  // Phase 3 — texte (800 → 1200ms => 0.32 → 0.48)
+  late final Animation<double> _titleOpacity;
+  late final Animation<double> _titleTranslateY;
+  late final Animation<double> _subtitleOpacity;
+  late final Animation<double> _subtitleTranslateY;
 
   @override
   void initState() {
     super.initState();
-    _bell = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _translateY = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -8.0), weight: 50),
-      TweenSequenceItem(tween: Tween(begin: -8.0, end: 0.0), weight: 50),
-    ]).animate(CurvedAnimation(parent: _bell, curve: Curves.easeOut));
-    _scale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.05), weight: 50),
-      TweenSequenceItem(tween: Tween(begin: 1.05, end: 1.0), weight: 50),
-    ]).animate(CurvedAnimation(parent: _bell, curve: Curves.easeOut));
-    _bell.forward();
 
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    );
+
+    // Phase 1 — 0.0 → 0.16
+    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.16, curve: Curves.elasticOut),
+      ),
+    );
+    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.16, curve: Curves.easeOut),
+      ),
+    );
+
+    // Phase 2 — 0.16 → 0.32
+    _bounceY = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.0, end: -15.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: -15.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 50,
+      ),
+    ]).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.16, 0.32),
+      ),
+    );
+    _bouncePulse = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.05)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.05, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 50,
+      ),
+    ]).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.16, 0.32),
+      ),
+    );
+
+    // Phase 3 — 0.32 → 0.48 (titre) + 0.40 → 0.56 (sous-titre décalé 200ms)
+    _titleOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.32, 0.48, curve: Curves.easeOut),
+      ),
+    );
+    _titleTranslateY = Tween<double>(begin: 20.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.32, 0.48, curve: Curves.easeOut),
+      ),
+    );
+    _subtitleOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.40, 0.56, curve: Curves.easeOut),
+      ),
+    );
+    _subtitleTranslateY = Tween<double>(begin: 20.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.40, 0.56, curve: Curves.easeOut),
+      ),
+    );
+
+    _controller.forward();
+
+    // Phase 4 — navigation à la fin du controller (≈2500ms total)
     Future.delayed(const Duration(milliseconds: 2500), _decideRoute);
   }
 
@@ -51,7 +137,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   void dispose() {
-    _bell.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -68,62 +154,73 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           child: Column(
             children: [
               const Spacer(flex: 3),
-              // ── Carte logo inclinée ────────────────────────────────────
-              Transform.rotate(
-                angle: 3 * 3.1415926 / 180,
-                child: AnimatedBuilder(
-                  animation: _bell,
-                  builder: (_, child) => Transform.translate(
-                    offset: Offset(0, _translateY.value),
-                    child: Transform.scale(scale: _scale.value, child: child),
-                  ),
-                  child: Container(
-                    width: 200,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(40),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.18),
-                          blurRadius: 30,
-                          offset: const Offset(0, 14),
+              // ── Carte logo animée ─────────────────────────────────────
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (_, child) {
+                  return Opacity(
+                    opacity: _logoOpacity.value.clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(0, _bounceY.value),
+                      child: Transform.scale(
+                        scale: _logoScale.value * _bouncePulse.value,
+                        child: Transform.rotate(
+                          angle: 3 * math.pi / 180,
+                          child: child,
                         ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(40),
-                      child: Image.asset(
-                        'assets/images/logo_nyama.jpg',
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.cover,
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
+                child: _LogoCard(),
               ),
               const SizedBox(height: 32),
-              const Text(
-                'NYAMA',
-                style: TextStyle(
-                  fontFamily: AppTheme.headlineFamily,
-                  fontSize: 48,
-                  fontWeight: FontWeight.w900,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -1.5,
-                  color: Colors.white,
-                  height: 1.0,
+              // ── Titre ─────────────────────────────────────────────────
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (_, child) {
+                  return Opacity(
+                    opacity: _titleOpacity.value.clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(0, _titleTranslateY.value),
+                      child: child,
+                    ),
+                  );
+                },
+                child: const Text(
+                  'NYAMA',
+                  style: TextStyle(
+                    fontFamily: AppTheme.headlineFamily,
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: -1.5,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'L\'EXCELLENCE CULINAIRE',
-                style: TextStyle(
-                  fontSize: 14,
-                  letterSpacing: 4.2, // ≈ 0.3em
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.9),
+              // ── Sous-titre ────────────────────────────────────────────
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (_, child) {
+                  return Opacity(
+                    opacity: _subtitleOpacity.value.clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(0, _subtitleTranslateY.value),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Text(
+                  'L\'EXCELLENCE CULINAIRE',
+                  style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 3.6, // ≈ 0.3em
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
                 ),
               ),
               const Spacer(flex: 3),
@@ -167,6 +264,68 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LogoCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      height: 220,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 200,
+            height: 200,
+            margin: const EdgeInsets.only(top: 10, left: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(40),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 34,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(40),
+              child: Image.asset(
+                'assets/images/logo_nyama.jpg',
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          // Chip décoratif en haut à droite
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.2),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.restaurant,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
