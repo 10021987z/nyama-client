@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
@@ -63,13 +64,15 @@ class _CookDetailViewState extends State<_CookDetailView>
   late final TabController _tabController;
   late final Map<String, List<MenuItem>> _grouped;
   late final List<String> _categories;
+  late final List<String> _allTabs;
 
   @override
   void initState() {
     super.initState();
     _grouped = _groupedMenu();
     _categories = _grouped.keys.toList();
-    _tabController = TabController(length: _categories.length, vsync: this);
+    _allTabs = [..._categories, 'Avis', 'Infos'];
+    _tabController = TabController(length: _allTabs.length, vsync: this);
   }
 
   @override
@@ -145,77 +148,81 @@ class _CookDetailViewState extends State<_CookDetailView>
               ),
 
               // ── Tabs ───────────────────────────────────────────────
-              if (_categories.length > 1)
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _TabBarDelegate(
-                    tabBar: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      labelColor: AppColors.primaryVibrant,
-                      unselectedLabelColor: AppColors.textSecondary,
-                      indicatorColor: AppColors.primaryVibrant,
-                      indicatorWeight: 3,
-                      labelStyle: TextStyle(fontFamily: 'Montserrat',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      unselectedLabelStyle: TextStyle(fontFamily: 'NunitoSans',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      labelPadding:
-                          const EdgeInsets.symmetric(horizontal: 16),
-                      tabs: _categories
-                          .map((c) => Tab(text: c))
-                          .toList(),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _TabBarDelegate(
+                  tabBar: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: AppColors.primaryVibrant,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    indicatorColor: AppColors.primaryVibrant,
+                    indicatorWeight: 3,
+                    labelStyle: TextStyle(fontFamily: 'Montserrat',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      fontStyle: FontStyle.italic,
                     ),
+                    unselectedLabelStyle: TextStyle(fontFamily: 'NunitoSans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    labelPadding:
+                        const EdgeInsets.symmetric(horizontal: 16),
+                    tabs: _allTabs.map((c) => Tab(text: c)).toList(),
                   ),
                 ),
+              ),
             ],
             body: TabBarView(
               controller: _tabController,
-              children: _categories.map((cat) {
-                final items = _grouped[cat] ?? [];
-                if (items.isEmpty) {
-                  return const Center(
-                    child: NyamaErrorWidget(
-                      emoji: '🍽️',
-                      message: 'Aucun plat disponible pour le moment',
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  padding: EdgeInsets.fromLTRB(
-                      16, 16, 16, cartCount > 0 ? 100 : 24),
-                  itemCount: items.length + 1, // +1 for section header
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return _SectionHeader(
-                        title: cat,
-                        subtitle:
-                            '${items.length} plat${items.length > 1 ? 's' : ''} disponible${items.length > 1 ? 's' : ''}',
-                      );
-                    }
-                    final item = items[index - 1];
-                    final qty = widget.cart
-                        .where((i) => i.menuItemId == item.id)
-                        .fold(0, (s, i) => s + i.quantity);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _VibrantMenuCard(
-                        item: item,
-                        quantity: qty,
-                        onAdd: () => _handleAdd(context, item),
-                        onRemove: () =>
-                            widget.cartNotifier.removeItem(item.id),
+              children: [
+                ..._categories.map((cat) {
+                  final items = _grouped[cat] ?? [];
+                  if (items.isEmpty) {
+                    return const Center(
+                      child: NyamaErrorWidget(
+                        emoji: '🍽️',
+                        message: 'Aucun plat disponible pour le moment',
                       ),
                     );
-                  },
-                );
-              }).toList(),
+                  }
+                  return ListView.builder(
+                    padding: EdgeInsets.fromLTRB(
+                        16, 16, 16, cartCount > 0 ? 100 : 24),
+                    itemCount: items.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return _SectionHeader(
+                          title: cat,
+                          subtitle:
+                              '${items.length} plat${items.length > 1 ? 's' : ''} disponible${items.length > 1 ? 's' : ''}',
+                        );
+                      }
+                      final item = items[index - 1];
+                      final qty = widget.cart
+                          .where((i) => i.menuItemId == item.id)
+                          .fold(0, (s, i) => s + i.quantity);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _VibrantMenuCard(
+                          item: item,
+                          quantity: qty,
+                          onAdd: () => _handleAdd(context, item),
+                          onRemove: () =>
+                              widget.cartNotifier.removeItem(item.id),
+                        ),
+                      );
+                    },
+                  );
+                }),
+                _ReviewsTab(bottomPadding: cartCount > 0 ? 100 : 24),
+                _InfoTab(
+                  cook: widget.cook,
+                  bottomPadding: cartCount > 0 ? 100 : 24,
+                ),
+              ],
             ),
           ),
 
@@ -878,6 +885,249 @@ class _LoadingView extends StatelessWidget {
             child: MenuItemShimmer(),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Reviews Tab (mock data fallback) ────────────────────────────────────
+
+class _MockReview {
+  final String name;
+  final int stars;
+  final String comment;
+  final String dish;
+  const _MockReview(this.name, this.stars, this.comment, this.dish);
+}
+
+class _ReviewsTab extends StatelessWidget {
+  final double bottomPadding;
+  const _ReviewsTab({required this.bottomPadding});
+
+  static const List<_MockReview> _mockReviews = [
+    _MockReview(
+      'Samuel M.',
+      5,
+      'Le Ndolé était sucré ! On sent la fraîcheur des arachides.',
+      'Ndolé Royal',
+    ),
+    _MockReview(
+      'Alice E.',
+      4,
+      'Poulet DG bien assaisonné. Livraison un peu lente mais ça valait le coup.',
+      'Poulet DG',
+    ),
+    _MockReview(
+      'Paul K.',
+      5,
+      'Le meilleur Achu de Douala. Le piment jaune est juste incroyable.',
+      'Achu',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+      itemCount: _mockReviews.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, i) {
+        final r = _mockReviews[i];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.onSurface.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                    child: Text(
+                      r.name[0],
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      r.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (idx) => Icon(
+                        idx < r.stars ? Icons.star : Icons.star_border,
+                        size: 16,
+                        color: const Color(0xFFF5B301),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                r.comment,
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  r.dish,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Info Tab ────────────────────────────────────────────────────────────
+
+class _InfoTab extends StatelessWidget {
+  final Cook cook;
+  final double bottomPadding;
+  const _InfoTab({required this.cook, required this.bottomPadding});
+
+  Future<void> _call() async {
+    final uri = Uri.parse('tel:+237699000000');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final address = [
+      cook.landmark,
+      cook.quarter?.name,
+    ].where((e) => e != null && e.isNotEmpty).join(' • ');
+    return ListView(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+      children: [
+        _InfoRow(
+          icon: Icons.location_on_outlined,
+          label: 'Adresse',
+          value: address.isEmpty ? 'Douala, Cameroun' : address,
+        ),
+        const SizedBox(height: 12),
+        const _InfoRow(
+          icon: Icons.schedule,
+          label: 'Horaires',
+          value: '08h00 - 20h00',
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: _call,
+          borderRadius: BorderRadius.circular(16),
+          child: const _InfoRow(
+            icon: Icons.phone_outlined,
+            label: 'Téléphone',
+            value: '+237 6 99 00 00 00',
+            isLink: true,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isLink;
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.isLink = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isLink
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isLink)
+            const Icon(Icons.call, color: AppColors.primary, size: 18),
+        ],
       ),
     );
   }

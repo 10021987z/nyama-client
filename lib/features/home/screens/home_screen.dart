@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/network/connectivity_notifier.dart';
 import '../../../core/network/socket_provider.dart';
 import '../../../shared/widgets/bottom_nav_bar.dart';
+import '../../../shared/widgets/offline_banner.dart';
 import '../../cart/screens/cart_screen.dart';
 import '../../orders/screens/orders_list_screen.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -80,36 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Column(
         children: [
           // ── Bannière hors-ligne ───────────────────────────────────────
-          ValueListenableBuilder<bool>(
-            valueListenable: offlineNotifier,
-            builder: (context, isOffline, _) {
-              if (!isOffline) return const SizedBox.shrink();
-              return Container(
-                width: double.infinity,
-                color: AppColors.error,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                child: const SafeArea(
-                  bottom: false,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.wifi_off, color: Colors.white, size: 16),
-                      SizedBox(width: 8),
-                      Text(
-                        '📡 Hors connexion',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+          const OfflineBanner(),
 
           // ── Contenu principal ─────────────────────────────────────────
           Expanded(

@@ -333,7 +333,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   }
 
   Future<void> _callRider(String? phone) async {
-    final number = phone ?? '+237600000000';
+    final number = phone ?? '+237699000000';
     final uri = Uri.parse('tel:$number');
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
@@ -346,6 +346,12 @@ class _RiderCard extends StatelessWidget {
   final VoidCallback onCall;
 
   const _RiderCard({required this.phone, required this.onCall});
+
+  Future<void> _sms() async {
+    final number = phone ?? '+237699000000';
+    final uri = Uri.parse('sms:$number');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +428,7 @@ class _RiderCard extends StatelessWidget {
           ),
           _RoundBtn(icon: Icons.phone_rounded, onTap: onCall),
           const SizedBox(width: 8),
-          _RoundBtn(icon: Icons.chat_bubble_outline_rounded, onTap: () {}),
+          _RoundBtn(icon: Icons.chat_bubble_outline_rounded, onTap: _sms),
         ],
       ),
     );

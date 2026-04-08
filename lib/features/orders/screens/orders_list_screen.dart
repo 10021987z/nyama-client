@@ -111,9 +111,33 @@ class _OrdersTab extends StatelessWidget {
               children: [
                 Text(emptyEmoji, style: const TextStyle(fontSize: 56)),
                 const SizedBox(height: 16),
+                const Text(
+                  'Pas encore de commande',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
                 Text(emptyMessage,
                     style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 15)),
+                        color: AppColors.textSecondary, fontSize: 14)),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () => context.go('/home'),
+                  icon: const Icon(Icons.restaurant_menu, size: 18),
+                  label: const Text('Explorer les plats'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.forestGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
               ],
             ),
           );
