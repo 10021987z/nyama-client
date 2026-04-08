@@ -1,4 +1,6 @@
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/fcfa_formatter.dart';
+import '../../../shared/widgets/cart_bounce_controller.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/models/cook.dart';
 import '../data/models/menu_item.dart';
@@ -149,11 +152,37 @@ class HomeTab extends ConsumerStatefulWidget {
   ConsumerState<HomeTab> createState() => _HomeTabState();
 }
 
+/// Quartiers connus — coordonnées approximatives pour la détection.
+class _KnownQuartier {
+  final String city;
+  final String name;
+  final double lat;
+  final double lng;
+  const _KnownQuartier(this.city, this.name, this.lat, this.lng);
+}
+
+const _knownQuartiers = <_KnownQuartier>[
+  _KnownQuartier('Douala', 'Akwa', 4.0445, 9.6966),
+  _KnownQuartier('Douala', 'Bonapriso', 4.0200, 9.6900),
+  _KnownQuartier('Douala', 'Deido', 4.0550, 9.6850),
+  _KnownQuartier('Douala', 'Bonanjo', 4.0300, 9.7050),
+  _KnownQuartier('Yaoundé', 'Bastos', 3.8800, 11.5100),
+];
+
+class _LocationInfo {
+  final String? city;
+  final String? quartier;
+  const _LocationInfo(this.city, this.quartier);
+  bool get isResolved => quartier != null && quartier!.isNotEmpty;
+}
+
 class _HomeTabState extends ConsumerState<HomeTab>
     with SingleTickerProviderStateMixin {
   String _activeCategory = _kAllCategory;
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fade;
+  final ValueNotifier<_LocationInfo> _location =
+      ValueNotifier(const _LocationInfo(null, null));
 
   @override
   void initState() {
@@ -169,8 +198,12 @@ class _HomeTabState extends ConsumerState<HomeTab>
 
   Future<void> _autoLocateIfNeeded() async {
     try {
-      final existing = await SecureStorage.getQuartier();
-      if (existing != null && existing.isNotEmpty) return;
+      final city = await SecureStorage.getCity();
+      final quartier = await SecureStorage.getQuartier();
+      if (quartier != null && quartier.isNotEmpty) {
+        _location.value = _LocationInfo(city, quartier);
+        return;
+      }
       if (!await Geolocator.isLocationServiceEnabled()) return;
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
@@ -180,18 +213,45 @@ class _HomeTabState extends ConsumerState<HomeTab>
           perm == LocationPermission.deniedForever) {
         return;
       }
-      await Geolocator.getCurrentPosition();
-      // On stocke "Douala" par défaut faute de reverse-geocoding ici.
-      await SecureStorage.saveQuartier('Douala', 'Akwa');
-      if (mounted) setState(() {});
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
+      );
+      final resolved = _resolveLocation(pos.latitude, pos.longitude);
+      await SecureStorage.saveQuartier(resolved.city!, resolved.quartier!);
+      if (mounted) _location.value = resolved;
     } catch (_) {
       // Silencieux : on garde "Localisation..." par défaut
     }
   }
 
+  _LocationInfo _resolveLocation(double lat, double lng) {
+    String city;
+    if (lat >= 4.0 && lat <= 4.15) {
+      city = 'Douala';
+    } else if (lat >= 3.8 && lat <= 3.95) {
+      city = 'Yaoundé';
+    } else {
+      city = 'Douala';
+    }
+    _KnownQuartier? best;
+    double bestDist = double.infinity;
+    for (final q in _knownQuartiers) {
+      final dLat = q.lat - lat;
+      final dLng = q.lng - lng;
+      final d = math.sqrt(dLat * dLat + dLng * dLng);
+      if (d < bestDist) {
+        bestDist = d;
+        best = q;
+      }
+    }
+    return _LocationInfo(city, best?.name ?? 'Akwa');
+  }
+
   @override
   void dispose() {
     _fadeCtrl.dispose();
+    _location.dispose();
     super.dispose();
   }
 
@@ -221,7 +281,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
         child: Material(
           color: _kCreme,
           elevation: 0,
-          child: const _Header(),
+          child: _Header(location: _location),
         ),
       ),
       body: RefreshIndicator(
@@ -267,7 +327,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
 
 // ─── Header ────────────────────────────────────────────────────────────────
 class _Header extends StatelessWidget {
-  const _Header();
+  final ValueNotifier<_LocationInfo> location;
+  const _Header({required this.location});
 
   @override
   Widget build(BuildContext context) {
@@ -320,21 +381,14 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    FutureBuilder<List<String?>>(
-                      future: Future.wait([
-                        SecureStorage.getCity(),
-                        SecureStorage.getQuartier(),
-                      ]),
-                      builder: (context, snap) {
-                        final data = snap.data;
-                        final city = data?[0];
-                        final quartier = data?[1];
-                        final hasLoc =
-                            quartier != null && quartier.isNotEmpty;
+                    ValueListenableBuilder<_LocationInfo>(
+                      valueListenable: location,
+                      builder: (context, info, _) {
+                        final hasLoc = info.isResolved;
                         final label = hasLoc
-                            ? (city != null && city.isNotEmpty
-                                ? '$city, $quartier'
-                                : quartier)
+                            ? (info.city != null && info.city!.isNotEmpty
+                                ? '${info.city}, ${info.quartier}'
+                                : info.quartier!)
                             : 'Localisation...';
                         return Row(
                           children: [
@@ -945,7 +999,7 @@ class _PopularGrid extends ConsumerWidget {
   }
 }
 
-class _DishCard extends StatelessWidget {
+class _DishCard extends StatefulWidget {
   final String name;
   final int priceXaf;
   final List<Color> gradient;
@@ -962,7 +1016,46 @@ class _DishCard extends StatelessWidget {
   });
 
   @override
+  State<_DishCard> createState() => _DishCardState();
+}
+
+class _DishCardState extends State<_DishCard> {
+  final GlobalKey _addBtnKey = GlobalKey();
+
+  Future<void> _flyToCart() async {
+    final ctx = _addBtnKey.currentContext;
+    if (ctx == null) return;
+    final box = ctx.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context);
+    if (box == null) return;
+    final start = box.localToGlobal(
+      Offset(box.size.width / 2, box.size.height / 2),
+    );
+    final screen = MediaQuery.of(context).size;
+    final safe = MediaQuery.of(context).padding.bottom;
+    final end = Offset(screen.width / 2, screen.height - safe - 60);
+
+    final entry = OverlayEntry(
+      builder: (_) => _FlyToCartOverlay(
+        start: start,
+        end: end,
+        imageAsset: widget.imageAsset,
+        gradient: widget.gradient,
+      ),
+    );
+    overlay.insert(entry);
+    await Future<void>.delayed(const Duration(milliseconds: 620));
+    entry.remove();
+    triggerCartBounce();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final name = widget.name;
+    final priceXaf = widget.priceXaf;
+    final gradient = widget.gradient;
+    final imageAsset = widget.imageAsset;
+    final onTap = widget.onTap;
     return Material(
       color: _kWhite,
       borderRadius: BorderRadius.circular(16),
@@ -995,7 +1088,13 @@ class _DishCard extends StatelessWidget {
                 Positioned(
                   right: 8,
                   bottom: 8,
-                  child: _AddButton(onAdd: onAdd),
+                  child: _AddButton(
+                    key: _addBtnKey,
+                    onAdd: () {
+                      _flyToCart();
+                      widget.onAdd();
+                    },
+                  ),
                 ),
               ],
             ),
@@ -1039,7 +1138,7 @@ class _DishCard extends StatelessWidget {
 // ─── Add button (scale on press) ───────────────────────────────────────────
 class _AddButton extends StatefulWidget {
   final VoidCallback onAdd;
-  const _AddButton({required this.onAdd});
+  const _AddButton({super.key, required this.onAdd});
 
   @override
   State<_AddButton> createState() => _AddButtonState();
@@ -1079,6 +1178,99 @@ class _AddButtonState extends State<_AddButton> {
           ),
           child: const Icon(Icons.add, color: _kWhite, size: 18),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Fly-to-cart overlay ───────────────────────────────────────────────────
+class _FlyToCartOverlay extends StatefulWidget {
+  final Offset start;
+  final Offset end;
+  final String imageAsset;
+  final List<Color> gradient;
+  const _FlyToCartOverlay({
+    required this.start,
+    required this.end,
+    required this.imageAsset,
+    required this.gradient,
+  });
+
+  @override
+  State<_FlyToCartOverlay> createState() => _FlyToCartOverlayState();
+}
+
+class _FlyToCartOverlayState extends State<_FlyToCartOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          final t = Curves.easeInOut.transform(_ctrl.value);
+          final x = widget.start.dx + (widget.end.dx - widget.start.dx) * t;
+          // Parabole : monte d'abord (soustraction d'une bosse) puis descend
+          final straightY =
+              widget.start.dy + (widget.end.dy - widget.start.dy) * t;
+          final peak = 120.0;
+          final bump = math.sin(t * math.pi) * peak;
+          final y = straightY - bump;
+          final scale = 1.0 - 0.3 * t;
+          final opacity = 1.0 - (t * 0.2);
+          return Positioned(
+            left: x - 20,
+            top: y - 20,
+            child: Opacity(
+              opacity: opacity.clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: widget.gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Image.asset(
+                    widget.imageAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

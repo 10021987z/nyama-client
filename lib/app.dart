@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
@@ -139,6 +140,7 @@ class App extends StatelessWidget {
     return MaterialApp.router(
       title: 'NYAMA',
       theme: AppTheme.light,
+      scaffoldMessengerKey: PushNotificationService.messengerKey,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
       locale: const Locale('fr', 'CM'),

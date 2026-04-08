@@ -59,6 +59,18 @@ class SecureStorage {
   static Future<String?> getQuartier() => _storage.read(key: _kQuartier);
   static Future<String?> getCity() => _storage.read(key: _kCity);
 
+  // Langue de l'interface ("fr" | "en" | "pidgin")
+  static const _kLanguage = 'language';
+  static Future<void> saveLanguage(String code) =>
+      _storage.write(key: _kLanguage, value: code);
+  static Future<String?> getLanguage() => _storage.read(key: _kLanguage);
+
+  // Token FCM
+  static const _kFcmToken = 'fcm_token';
+  static Future<void> saveFcmToken(String token) =>
+      _storage.write(key: _kFcmToken, value: token);
+  static Future<String?> getFcmToken() => _storage.read(key: _kFcmToken);
+
   // Vérifie si l'utilisateur est connecté
   static Future<bool> isLoggedIn() async {
     final token = await getAccessToken();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../features/cart/providers/cart_provider.dart';
+import 'cart_bounce_controller.dart';
 
 /// Bottom nav NYAMA — fond blanc, item actif = pill orange (icône blanche)
 /// + label orange 10px sous la pill. Pas de bordure supérieure visible.
@@ -77,7 +78,7 @@ class NyamaBottomNavBar extends ConsumerWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool isActive;
@@ -93,9 +94,57 @@ class _NavItem extends StatelessWidget {
   });
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bounceCtrl;
+  late final Animation<double> _bounce;
+  int _lastTick = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _bounceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+    _bounce = TweenSequence<double>([
+      TweenSequenceItem(
+          tween: Tween(begin: 1.0, end: 1.3)
+              .chain(CurveTween(curve: Curves.easeOut)),
+          weight: 50),
+      TweenSequenceItem(
+          tween: Tween(begin: 1.3, end: 1.0)
+              .chain(CurveTween(curve: Curves.easeIn)),
+          weight: 50),
+    ]).animate(_bounceCtrl);
+    _lastTick = cartBounceTick.value;
+    cartBounceTick.addListener(_onBounceTick);
+  }
+
+  void _onBounceTick() {
+    if (!mounted) return;
+    if (cartBounceTick.value != _lastTick) {
+      _lastTick = cartBounceTick.value;
+      _bounceCtrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    cartBounceTick.removeListener(_onBounceTick);
+    _bounceCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isActive = widget.isActive;
+    final badgeCount = widget.badgeCount;
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         width: 64,
@@ -115,7 +164,7 @@ class _NavItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    icon,
+                    widget.icon,
                     size: 22,
                     color: isActive ? Colors.white : AppColors.textTertiary,
                   ),
@@ -124,7 +173,9 @@ class _NavItem extends StatelessWidget {
                   Positioned(
                     top: -2,
                     right: -2,
-                    child: Container(
+                    child: ScaleTransition(
+                      scale: _bounce,
+                      child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
@@ -143,12 +194,13 @@ class _NavItem extends StatelessWidget {
                         ),
                       ),
                     ),
+                    ),
                   ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              label,
+              widget.label,
               style: TextStyle(
                 fontFamily: 'NunitoSans',
                 fontSize: 10,

@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
 
@@ -513,7 +516,24 @@ class ProfileScreen extends ConsumerWidget {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  void _showNotificationsSheet(BuildContext context) {
+  Future<void> _showNotificationsSheet(BuildContext context) async {
+    bool authorized = false;
+    try {
+      if (PushNotificationService.instance.isFirebaseAvailable) {
+        final settings =
+            await FirebaseMessaging.instance.getNotificationSettings();
+        authorized =
+            settings.authorizationStatus == AuthorizationStatus.authorized ||
+                settings.authorizationStatus ==
+                    AuthorizationStatus.provisional;
+      } else {
+        final status = await Permission.notification.status;
+        authorized = status.isGranted;
+      }
+    } catch (_) {
+      authorized = false;
+    }
+    if (!context.mounted) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceWhite,
@@ -525,13 +545,21 @@ class ProfileScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.notifications_off_outlined,
-                size: 56,
-                color: AppColors.textTertiary.withValues(alpha: 0.6)),
+            Icon(
+              authorized
+                  ? Icons.notifications_active_outlined
+                  : Icons.notifications_off_outlined,
+              size: 56,
+              color: authorized
+                  ? AppColors.primary
+                  : AppColors.textTertiary.withValues(alpha: 0.6),
+            ),
             const SizedBox(height: 12),
-            const Text(
-              'Aucune notification',
-              style: TextStyle(
+            Text(
+              authorized
+                  ? 'Notifications activées ✓'
+                  : 'Notifications désactivées',
+              style: const TextStyle(
                 fontFamily: 'Montserrat',
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -539,15 +567,31 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Tu seras prévenu dès qu\'il se passe quelque chose.',
+            Text(
+              authorized
+                  ? 'Tu seras prévenu dès qu\'il se passe quelque chose.'
+                  : 'Active les notifications dans les paramètres de ton téléphone.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'NunitoSans',
                 fontSize: 13,
                 color: AppColors.textSecondary,
               ),
             ),
+            if (!authorized) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await openAppSettings();
+                },
+                icon: const Icon(Icons.settings),
+                label: const Text('Ouvrir les paramètres'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -611,36 +655,64 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showLanguageDialog(BuildContext context) {
-    showDialog<void>(
+  Future<void> _showLanguageDialog(BuildContext context) async {
+    final current = (await SecureStorage.getLanguage()) ?? 'fr';
+    if (!context.mounted) return;
+    await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Choisir la langue'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.check_circle,
-                  color: AppColors.primary),
-              title: const Text('Français'),
-              onTap: () => Navigator.pop(ctx),
+      builder: (ctx) {
+        String selected = current;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Choisir la langue'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<String>(
+                  value: 'fr',
+                  groupValue: selected,
+                  activeColor: AppColors.primary,
+                  title: const Text('Français'),
+                  onChanged: (v) => setLocal(() => selected = v!),
+                ),
+                RadioListTile<String>(
+                  value: 'en',
+                  groupValue: selected,
+                  activeColor: AppColors.primary,
+                  title: const Text('English'),
+                  onChanged: (v) => setLocal(() => selected = v!),
+                ),
+                const ListTile(
+                  enabled: false,
+                  leading: Icon(Icons.lock_outline,
+                      size: 18, color: AppColors.textTertiary),
+                  title: Text('Pidgin'),
+                  subtitle: Text('Bientôt disponible'),
+                ),
+              ],
             ),
-            const ListTile(
-              enabled: false,
-              leading: Icon(Icons.lock_outline,
-                  size: 18, color: AppColors.textTertiary),
-              title: Text('Pidgin'),
-              subtitle: Text('Bientôt disponible'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fermer'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await SecureStorage.saveLanguage(selected);
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  final label =
+                      selected == 'en' ? 'English' : 'Français';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Langue changée en $label')),
+                  );
+                },
+                child: const Text('Valider'),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
