@@ -147,8 +147,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       orElse: () => const <MenuItem>[],
     );
 
-    final topPad = MediaQuery.of(context).padding.top;
-
     return Scaffold(
       backgroundColor: _kCreme,
       body: RefreshIndicator(
@@ -158,11 +156,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           ref.invalidate(filteredMenuItemsProvider);
           ref.invalidate(dailySpecialsProvider);
         },
-        child: Stack(
+        child: Column(
           children: [
-            ListView(
-              padding: EdgeInsets.only(top: topPad + 76, bottom: 32),
-              children: [
+            const _Header(),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(top: 8, bottom: 32),
+                children: [
                 const SizedBox(height: 8),
                 const _SearchBar(),
                 const SizedBox(height: 20),
@@ -185,8 +185,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 const SizedBox(height: 16),
                 _PopularGrid(items: menu),
               ],
+              ),
             ),
-            const _Header(),
           ],
         ),
       ),
@@ -200,11 +200,13 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
     return Container(
-      color: _kCreme.withValues(alpha: 0.7),
-      padding: EdgeInsets.fromLTRB(_kHPad, top + 12, _kHPad, 12),
-      child: Row(
+      color: _kCreme,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(_kHPad, 12, _kHPad, 12),
+          child: Row(
             children: [
               Container(
                 width: 40,
@@ -311,6 +313,8 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+        ),
       ),
     );
   }
