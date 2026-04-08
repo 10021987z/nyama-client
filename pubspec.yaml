@@ -52,6 +52,9 @@ dependencies:
   # Appel téléphonique direct
   url_launcher: ^6.2.0
 
+  # Partage natif (parrainage)
+  share_plus: ^10.0.0
+
   # SVG logo
   flutter_svg: ^2.0.0
 

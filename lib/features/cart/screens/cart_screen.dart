@@ -503,32 +503,101 @@ class _EmptyCart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shopping_cart_outlined,
-              size: 64,
-              color: AppColors.textTertiary.withValues(alpha: 0.5)),
-          const SizedBox(height: 16),
-          const Text(
-            'Votre panier est vide',
-            style: TextStyle(
-              fontFamily: 'Montserrat',
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.charcoal,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 140,
+              height: 140,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.1),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/mock/logo_nyama.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.restaurant_menu_rounded,
+                    size: 64,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "Ajoutez des plats depuis l'accueil",
-            style: TextStyle(
-              fontFamily: 'NunitoSans',
-              fontSize: 14,
-              color: AppColors.textSecondary,
+            const SizedBox(height: 24),
+            const Text(
+              'Ton estomac gronde pour rien...',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: AppColors.charcoal,
+                height: 1.2,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            const Text(
+              "Les meilleurs plats camerounais t'attendent.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              height: 52,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      AppColors.primary,
+                      Color(0xFFD66700),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () => context.go('/home'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 32),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'Explorer les plats',
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

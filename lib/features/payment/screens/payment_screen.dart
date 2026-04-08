@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../orders/data/orders_repository.dart';
 import '../data/checkout_data.dart';
@@ -22,9 +23,20 @@ class PaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
-  String _method = 'mtn_momo'; // 'mtn_momo' | 'orange_money'
-  final _phoneController = TextEditingController(text: '+237 6XX XXX XXX');
+  String _method = 'mtn_momo'; // 'mtn_momo' | 'orange_money' | 'falla_momo'
+  late final TextEditingController _phoneController;
   bool _processing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final userPhone = ref.read(authStateProvider).user?.phone;
+    _phoneController = TextEditingController(
+      text: (userPhone != null && userPhone.isNotEmpty)
+          ? userPhone
+          : '+237 6XX XXX XXX',
+    );
+  }
 
   // Adresse — pré-remplie. Brief : "Bonapriso, Douala / Appartement 4B"
   String _address = 'Bonapriso, Douala';
@@ -114,6 +126,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         iconColor: AppColors.primary,
                         selected: _method == 'orange_money',
                         onTap: () => setState(() => _method = 'orange_money'),
+                      ),
+                      const SizedBox(height: 10),
+                      _PaymentMethodCard(
+                        title: 'Falla Mobile Money',
+                        subtitle: 'Paiement instantané',
+                        iconColor: AppColors.forestGreen,
+                        selected: _method == 'falla_momo',
+                        onTap: () => setState(() => _method = 'falla_momo'),
                       ),
                       const SizedBox(height: 24),
 

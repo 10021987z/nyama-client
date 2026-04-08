@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/storage/secure_storage.dart';
@@ -163,6 +164,29 @@ class _HomeTabState extends ConsumerState<HomeTab>
     );
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoLocateIfNeeded());
+  }
+
+  Future<void> _autoLocateIfNeeded() async {
+    try {
+      final existing = await SecureStorage.getQuartier();
+      if (existing != null && existing.isNotEmpty) return;
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
+      await Geolocator.getCurrentPosition();
+      // On stocke "Douala" par défaut faute de reverse-geocoding ici.
+      await SecureStorage.saveQuartier('Douala', 'Akwa');
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Silencieux : on garde "Localisation..." par défaut
+    }
   }
 
   @override

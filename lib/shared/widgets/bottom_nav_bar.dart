@@ -59,7 +59,7 @@ class NyamaBottomNavBar extends ConsumerWidget {
               ),
               _NavItem(
                 icon: Icons.receipt_long_rounded,
-                label: 'COMMANDES',
+                label: 'COMMANDE',
                 isActive: currentIndex == 3,
                 onTap: () => onTap(3),
               ),

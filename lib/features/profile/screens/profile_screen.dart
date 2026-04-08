@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
 
 /// Écran 1.9 — Profil NYAMA+.
@@ -13,7 +16,9 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).user;
-    final name = user?.name ?? 'Arthur Kamga';
+    final name = (user?.name?.isNotEmpty ?? false)
+        ? user!.name!
+        : 'Utilisateur NYAMA';
 
     return ColoredBox(
       color: AppColors.creme,
@@ -77,16 +82,10 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ),
-          CircleAvatar(
+          const CircleAvatar(
             radius: 20,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-            child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'A',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
-              ),
-            ),
+            backgroundColor: AppColors.primary,
+            backgroundImage: AssetImage('assets/images/mock/logo_nyama.jpg'),
           ),
         ],
       ),
@@ -106,16 +105,10 @@ class ProfileScreen extends ConsumerWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.primary, width: 2),
               ),
-              child: CircleAvatar(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : 'A',
-                  style: const TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
+              child: const CircleAvatar(
+                backgroundColor: AppColors.primary,
+                backgroundImage:
+                    AssetImage('assets/images/mock/logo_nyama.jpg'),
               ),
             ),
             Positioned(
@@ -146,19 +139,34 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.location_on, size: 14, color: AppColors.primary),
-            const SizedBox(width: 4),
-            Text(
-              'Douala, Akwa',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-              ),
-            ),
-          ],
+        FutureBuilder<List<String?>>(
+          future: Future.wait([
+            SecureStorage.getCity(),
+            SecureStorage.getQuartier(),
+          ]),
+          builder: (context, snap) {
+            final city = snap.data?[0];
+            final quartier = snap.data?[1];
+            final label = (city != null && quartier != null)
+                ? '$city, $quartier'
+                : (quartier ?? city ?? 'Douala');
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.location_on,
+                    size: 14, color: AppColors.primary),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color:
+                        AppColors.textSecondary.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -272,8 +280,15 @@ class ProfileScreen extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             height: 42,
-            child: ElevatedButton(
-              onPressed: () {},
+            child: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text('Fonctionnalité bientôt disponible !'),
+                    ),
+                  );
+                },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.forestGreen,
@@ -284,6 +299,7 @@ class ProfileScreen extends ConsumerWidget {
               child: const Text(
                 'Essayer 7 jours gratuit',
                 style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               ),
             ),
           ),
@@ -354,7 +370,11 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Share.share(
+                    'Rejoins NYAMA et gagne 500 FCFA ! Code : ARTHUR237. Télécharge l\'app : https://nyama.cm',
+                  );
+                },
                 style: TextButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -397,13 +417,18 @@ class ProfileScreen extends ConsumerWidget {
 
   Widget _buildMenuItems(BuildContext context) {
     final items = <_MenuEntry>[
-      _MenuEntry(Icons.notifications_none, 'Notifications'),
-      _MenuEntry(Icons.location_on_outlined, 'Mes adresses'),
+      _MenuEntry(Icons.notifications_none, 'Notifications',
+          onTap: () => _showNotificationsSheet(context)),
+      _MenuEntry(Icons.location_on_outlined, 'Mes adresses',
+          onTap: () => context.push('/onboarding/quartier')),
       _MenuEntry(Icons.receipt_long, 'Historique commandes',
           onTap: () => context.go('/orders')),
-      _MenuEntry(Icons.payments_outlined, 'Moyens de paiement (MoMo/OM)'),
-      _MenuEntry(Icons.language, 'Langue (Français/Pidgin)'),
-      _MenuEntry(Icons.help_outline, 'Support & Aide'),
+      _MenuEntry(Icons.payments_outlined, 'Moyens de paiement (MoMo/OM)',
+          onTap: () => _showPaymentMethodsSheet(context)),
+      _MenuEntry(Icons.language, 'Langue (Français/Pidgin)',
+          onTap: () => _showLanguageDialog(context)),
+      _MenuEntry(Icons.help_outline, 'Support & Aide',
+          onTap: _openWhatsAppSupport),
     ];
     return Column(
       children: [
@@ -475,8 +500,198 @@ class ProfileScreen extends ConsumerWidget {
     );
     if (confirm == true && context.mounted) {
       await ref.read(authStateProvider.notifier).logout();
-      if (context.mounted) context.go('/onboarding');
+      await SecureStorage.clearAll();
+      if (context.mounted) context.go('/onboarding/phone');
     }
+  }
+
+  // ─── Helpers : feuilles modales / dialogues ─────────────────────────────
+
+  Future<void> _openWhatsAppSupport() async {
+    final uri = Uri.parse(
+        'https://wa.me/237699000000?text=Bonjour%20NYAMA');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _showNotificationsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.notifications_off_outlined,
+                size: 56,
+                color: AppColors.textTertiary.withValues(alpha: 0.6)),
+            const SizedBox(height: 12),
+            const Text(
+              'Aucune notification',
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.charcoal,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Tu seras prévenu dès qu\'il se passe quelque chose.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPaymentMethodsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceWhite,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Moyens de paiement',
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.charcoal,
+                  ),
+                ),
+                SizedBox(height: 16),
+                _PaymentMethodTile(
+                  label: 'MTN Mobile Money',
+                  color: Color(0xFFFFCC00),
+                  icon: Icons.account_balance_wallet_rounded,
+                ),
+                SizedBox(height: 10),
+                _PaymentMethodTile(
+                  label: 'Orange Money',
+                  color: Color(0xFFF57C20),
+                  icon: Icons.account_balance_wallet_rounded,
+                ),
+                SizedBox(height: 10),
+                _PaymentMethodTile(
+                  label: 'Falla Mobile Money',
+                  color: Color(0xFF1B4332),
+                  icon: Icons.account_balance_wallet_rounded,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLanguageDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choisir la langue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.check_circle,
+                  color: AppColors.primary),
+              title: const Text('Français'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+            const ListTile(
+              enabled: false,
+              leading: Icon(Icons.lock_outline,
+                  size: 18, color: AppColors.textTertiary),
+              title: Text('Pidgin'),
+              subtitle: Text('Bientôt disponible'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Payment method tile (sheet) ────────────────────────────────────────────
+class _PaymentMethodTile extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+  const _PaymentMethodTile({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.charcoal,
+              ),
+            ),
+          ),
+          const Icon(Icons.chevron_right,
+              color: AppColors.textTertiary, size: 20),
+        ],
+      ),
+    );
   }
 }
 
