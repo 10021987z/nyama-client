@@ -49,6 +49,10 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
         context.go('/onboarding/otp', extra: next.phone);
       }
       if (next.status == AuthStatus.authenticated) {
+        if (next.isNewUser) {
+          context.go('/welcome');
+          return;
+        }
         // Google / Email success → route vers quartier ou home
         SecureStorage.getQuartier().then((q) {
           if (!context.mounted) return;

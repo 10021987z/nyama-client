@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/biometric_service.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -440,6 +441,8 @@ class ProfileScreen extends ConsumerWidget {
           onTap: () => _showPaymentMethodsSheet(context)),
       _MenuEntry(Icons.language, 'Langue (Français/Pidgin)',
           onTap: () => _showLanguageDialog(context)),
+      _MenuEntry(Icons.fingerprint, 'Sécurité biométrique',
+          onTap: () => _showBiometricSheet(context)),
       _MenuEntry(Icons.help_outline, 'Support & Aide',
           onTap: _openWhatsAppSupport),
     ];
@@ -519,6 +522,77 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   // ─── Helpers : feuilles modales / dialogues ─────────────────────────────
+
+  Future<void> _showBiometricSheet(BuildContext context) async {
+    final available =
+        await BiometricService.instance.isBiometricAvailable();
+    bool enabled = await SecureStorage.getBiometricEnabled();
+    if (!context.mounted) return;
+    if (!available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              "Biométrie non disponible sur ce téléphone"),
+        ),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.fingerprint,
+                    size: 56, color: AppColors.primary),
+                const SizedBox(height: 12),
+                const Text(
+                  'Sécurité biométrique',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  "Protège l'ouverture de l'app et les paiements avec ton empreinte.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile.adaptive(
+                  value: enabled,
+                  activeThumbColor: AppColors.primary,
+                  title: const Text('Activer la biométrie'),
+                  onChanged: (v) async {
+                    if (v) {
+                      final ok = await BiometricService.instance
+                          .authenticate(
+                              reason: 'Confirme pour activer la biométrie');
+                      if (!ok) return;
+                    }
+                    await SecureStorage.setBiometricEnabled(v);
+                    setLocal(() => enabled = v);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   Future<void> _openWhatsAppSupport() async {
     final uri = Uri.parse(

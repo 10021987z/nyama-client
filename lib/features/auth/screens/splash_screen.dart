@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/biometric_service.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
@@ -125,14 +127,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     Future.delayed(const Duration(milliseconds: 2500), _decideRoute);
   }
 
-  void _decideRoute() {
+  Future<void> _decideRoute() async {
     if (!mounted) return;
     final status = ref.read(authStateProvider).status;
-    if (status == AuthStatus.authenticated) {
-      context.go('/home');
-    } else {
+    if (status != AuthStatus.authenticated) {
       context.go('/onboarding/phone');
+      return;
     }
+    // Biométrie : si activée + disponible, demande l'empreinte
+    final biometricEnabled = await SecureStorage.getBiometricEnabled();
+    if (biometricEnabled) {
+      final available = await BiometricService.instance.isBiometricAvailable();
+      if (available) {
+        final ok = await BiometricService.instance.authenticate();
+        if (!mounted) return;
+        if (!ok) {
+          context.go('/onboarding/phone');
+          return;
+        }
+      }
+    }
+    if (!mounted) return;
+    context.go('/home');
   }
 
   @override

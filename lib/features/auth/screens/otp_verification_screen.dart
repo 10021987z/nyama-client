@@ -149,6 +149,12 @@ class _OtpVerificationScreenState
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authStateProvider, (prev, next) {
       if (next.status == AuthStatus.authenticated) {
+        if (next.isNewUser) {
+          TextInput.finishAutofillContext();
+          context.go('/welcome');
+          return;
+        }
+        TextInput.finishAutofillContext();
         SecureStorage.getQuartier().then((q) {
           if (!context.mounted) return;
           if (q != null && q.isNotEmpty) {

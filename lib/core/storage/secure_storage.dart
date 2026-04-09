@@ -105,6 +105,15 @@ class SecureStorage {
   static Future<void> clearSearchHistory() =>
       _storage.delete(key: _kSearchHistory);
 
+  // Authentification biométrique activée
+  static const _kBiometricEnabled = 'biometric_enabled';
+  static Future<void> setBiometricEnabled(bool v) =>
+      _storage.write(key: _kBiometricEnabled, value: v ? '1' : '0');
+  static Future<bool> getBiometricEnabled() async {
+    final v = await _storage.read(key: _kBiometricEnabled);
+    return v == '1';
+  }
+
   // Vérifie si l'utilisateur est connecté
   static Future<bool> isLoggedIn() async {
     final token = await getAccessToken();

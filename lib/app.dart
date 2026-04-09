@@ -8,6 +8,7 @@ import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/phone_input_screen.dart';
 import 'features/auth/screens/otp_verification_screen.dart';
 import 'features/auth/screens/email_login_screen.dart';
+import 'features/auth/screens/welcome_screen.dart';
 import 'features/auth/screens/quartier_selection_screen.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
@@ -47,6 +48,7 @@ class App extends StatelessWidget {
         path: '/onboarding/email',
         builder: (c, s) => const EmailLoginScreen(),
       ),
+      GoRoute(path: '/welcome', builder: (c, s) => const WelcomeScreen()),
       // ── Aliases (compat ancien code) ──────────────────────────────────
       GoRoute(path: '/phone', builder: (c, s) => const PhoneInputScreen()),
       GoRoute(

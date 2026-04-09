@@ -73,6 +73,9 @@ dependencies:
   # Image picker (photo profil)
   image_picker: ^1.1.2
 
+  # Authentification biométrique (empreinte / FaceID)
+  local_auth: ^2.3.0
+
   # NOTE: google_fonts removed — using bundled Montserrat, NunitoSans, SpaceMono
 
 dev_dependencies:

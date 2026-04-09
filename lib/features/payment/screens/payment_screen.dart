@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/biometric_service.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -277,9 +278,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
 
-    setState(() => _processing = true);
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
+
+    // Biométrie : si activée, demande une confirmation avant paiement
+    final biometricEnabled = await SecureStorage.getBiometricEnabled();
+    if (biometricEnabled) {
+      final available =
+          await BiometricService.instance.isBiometricAvailable();
+      if (available) {
+        final ok = await BiometricService.instance.authenticate(
+          reason: 'Confirme ton paiement de ${checkout.totalXaf.toFcfa()}',
+        );
+        if (!ok) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Paiement annulé')),
+          );
+          return;
+        }
+      }
+    }
+
+    setState(() => _processing = true);
 
     try {
       // 1. Créer la commande côté backend

@@ -40,6 +40,10 @@ class _EmailLoginScreenState extends ConsumerState<EmailLoginScreen> {
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authStateProvider, (prev, next) {
       if (next.status == AuthStatus.authenticated) {
+        if (next.isNewUser) {
+          _showEmailVerificationDialog(context, _emailCtrl.text.trim());
+          return;
+        }
         SecureStorage.getQuartier().then((q) {
           if (!context.mounted) return;
           if (q != null && q.isNotEmpty) {
@@ -191,6 +195,28 @@ class _EmailLoginScreenState extends ConsumerState<EmailLoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showEmailVerificationDialog(
+      BuildContext context, String email) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Vérifie ton email'),
+        content: Text(
+          "Un email de vérification a été envoyé à $email. Vérifie ta boîte mail pour confirmer ton compte.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("J'ai vérifié"),
+          ),
+        ],
+      ),
+    );
+    if (!context.mounted) return;
+    context.go('/welcome');
   }
 
   InputDecoration _inputDecoration({

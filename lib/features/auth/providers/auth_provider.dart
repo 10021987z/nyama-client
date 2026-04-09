@@ -23,12 +23,14 @@ class AuthState {
   final AppUser? user;
   final String? phone;         // Numéro en cours de vérification
   final String? errorMessage;
+  final bool isNewUser;         // true juste après une inscription réussie
 
   const AuthState({
     this.status = AuthStatus.initial,
     this.user,
     this.phone,
     this.errorMessage,
+    this.isNewUser = false,
   });
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
@@ -40,12 +42,14 @@ class AuthState {
     AppUser? user,
     String? phone,
     String? errorMessage,
+    bool? isNewUser,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
       phone: phone ?? this.phone,
       errorMessage: errorMessage,
+      isNewUser: isNewUser ?? this.isNewUser,
     );
   }
 }
@@ -165,6 +169,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           user: result.user ?? AppUser(id: cred.user?.uid ?? '', phone: phone),
           phone: phone,
+          isNewUser: cred.additionalUserInfo?.isNewUser ?? false,
         );
         return;
       } catch (e) {
@@ -202,11 +207,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final cred = isSignUp
           ? await _firebase.createAccountWithEmail(email, password)
           : await _firebase.signInWithEmail(email, password);
+      if (isSignUp) {
+        try {
+          await cred.user?.sendEmailVerification();
+        } catch (_) {}
+      }
       final result = await _syncFirebaseWithBackend(cred.user, email: email);
       if (!mounted) return;
       state = AuthState(
         status: AuthStatus.authenticated,
         user: result.user ?? AppUser(id: cred.user?.uid ?? '', phone: email),
+        isNewUser: isSignUp,
       );
     } catch (e) {
       if (!mounted) return;
@@ -235,6 +246,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
               phone: cred.user?.email ?? '',
               name: cred.user?.displayName,
             ),
+        isNewUser: cred.additionalUserInfo?.isNewUser ?? false,
       );
     } catch (e) {
       if (!mounted) return;
