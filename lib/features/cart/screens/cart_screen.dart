@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/auth_gate.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../payment/data/checkout_data.dart';
 import '../providers/cart_provider.dart';
@@ -133,9 +134,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  void _goToPayment(
-      CartNotifier notifier, int subtotal, int fee, int total) {
+  Future<void> _goToPayment(
+      CartNotifier notifier, int subtotal, int fee, int total) async {
     if (notifier.cookId == null) return;
+    // Auth gate : on demande l'identification seulement au checkout.
+    final ok = await AuthGate.ensureAuthenticated(context);
+    if (!ok || !mounted) return;
     final data = CheckoutData(
       items: List.of(ref.read(cartProvider)),
       cookId: notifier.cookId!,

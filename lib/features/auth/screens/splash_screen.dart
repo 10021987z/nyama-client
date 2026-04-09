@@ -9,7 +9,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
-import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -129,21 +128,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _decideRoute() async {
     if (!mounted) return;
-    final status = ref.read(authStateProvider).status;
-    if (status != AuthStatus.authenticated) {
-      context.go('/onboarding/phone');
+    // Modèle Uber Eats : accès libre à l'app.
+    // Au premier lancement (pas de quartier choisi), on propose l'onboarding
+    // localisation ; sinon on va direct sur /home — sans jamais exiger de login.
+    final quartier = await SecureStorage.getQuartier();
+    if (!mounted) return;
+    if (quartier == null || quartier.isEmpty) {
+      context.go('/onboarding/quartier');
       return;
     }
-    // Biométrie : si activée + disponible, demande l'empreinte
+
+    // Biométrie : uniquement si l'utilisateur EST déjà connecté ET l'a activée.
+    final token = await SecureStorage.getAccessToken();
     final biometricEnabled = await SecureStorage.getBiometricEnabled();
-    if (biometricEnabled) {
+    if (token != null && token.isNotEmpty && biometricEnabled) {
       final available = await BiometricService.instance.isBiometricAvailable();
       if (available) {
         final ok = await BiometricService.instance.authenticate();
         if (!mounted) return;
         if (!ok) {
-          context.go('/onboarding/phone');
-          return;
+          // Échec bio : on laisse quand même entrer en mode non-connecté
+          // (l'app est libre d'accès).
         }
       }
     }

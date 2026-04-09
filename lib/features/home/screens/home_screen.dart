@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/socket_provider.dart';
+import '../../../core/services/auth_gate.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../shared/widgets/bottom_nav_bar.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../cart/screens/cart_screen.dart';
@@ -35,6 +37,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _currentIndex = widget.initialTab;
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
+  }
+
+  Future<void> _onTabTap(int i) async {
+    // Les onglets Commandes (3) et Profil (4) exigent une auth.
+    if (i == 3 || i == 4) {
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        if (!mounted) return;
+        final ok = await AuthGate.ensureAuthenticated(context);
+        if (!ok || !mounted) return;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _currentIndex = i);
   }
 
   void _setupSocket() {
@@ -93,7 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       bottomNavigationBar: NyamaBottomNavBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: _onTabTap,
       ),
     );
   }

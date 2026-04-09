@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/services/auth_gate.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/fcfa_formatter.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../../shared/widgets/cart_bounce_controller.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/models/cook.dart';
@@ -326,12 +328,14 @@ class _HomeTabState extends ConsumerState<HomeTab>
 }
 
 // ─── Header ────────────────────────────────────────────────────────────────
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   final ValueNotifier<_LocationInfo> location;
   const _Header({required this.location});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAuth = ref.watch(authStateProvider).isAuthenticated;
+    final userName = ref.watch(authStateProvider).user?.name;
     return Container(
       color: _kCreme,
       child: SafeArea(
@@ -340,39 +344,61 @@ class _Header extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(_kHPad, 12, _kHPad, 12),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  color: _kOrange,
-                  shape: BoxShape.circle,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  'assets/images/mock/logo_nyama.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const Center(
-                    child: Text(
-                      'A',
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        color: _kWhite,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
+              if (isAuth)
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: _kOrange,
+                    shape: BoxShape.circle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset(
+                    'assets/images/mock/logo_nyama.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Text(
+                        'A',
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          color: _kWhite,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
+                )
+              else
+                TextButton(
+                  onPressed: () => AuthGate.ensureAuthenticated(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _kOrange,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Se connecter',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kOrange,
+                    ),
+                  ),
                 ),
-              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Bonjour Arthur 👋',
-                      style: TextStyle(
+                    Text(
+                      isAuth
+                          ? 'Bonjour ${(userName ?? '').isNotEmpty ? userName! : 'toi'} 👋'
+                          : 'Bienvenue 👋',
+                      style: const TextStyle(
                         fontFamily: 'Montserrat',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
