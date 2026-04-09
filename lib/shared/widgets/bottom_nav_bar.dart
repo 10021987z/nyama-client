@@ -9,11 +9,13 @@ import 'cart_bounce_controller.dart';
 class NyamaBottomNavBar extends ConsumerWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final bool isAuthenticated;
 
   const NyamaBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.isAuthenticated = true,
   });
 
   @override
@@ -66,8 +68,9 @@ class NyamaBottomNavBar extends ConsumerWidget {
               ),
               _NavItem(
                 icon: Icons.person_rounded,
-                label: 'PROFIL',
+                label: isAuthenticated ? 'PROFIL' : 'SE CONNECTER',
                 isActive: currentIndex == 4,
+                showDot: !isAuthenticated,
                 onTap: () => onTap(4),
               ),
             ],
@@ -83,6 +86,7 @@ class _NavItem extends StatefulWidget {
   final String label;
   final bool isActive;
   final int badgeCount;
+  final bool showDot;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -90,6 +94,7 @@ class _NavItem extends StatefulWidget {
     required this.label,
     required this.isActive,
     this.badgeCount = 0,
+    this.showDot = false,
     required this.onTap,
   });
 
@@ -169,6 +174,23 @@ class _NavItemState extends State<_NavItem>
                     color: isActive ? Colors.white : AppColors.textTertiary,
                   ),
                 ),
+                if (widget.showDot && badgeCount == 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.surfaceWhite,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (badgeCount > 0)
                   Positioned(
                     top: -2,

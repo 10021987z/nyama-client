@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/auth_gate.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
@@ -929,9 +930,13 @@ class _ReviewsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
-      itemCount: _mockReviews.length,
+      itemCount: _mockReviews.length + 1,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, i) {
+      itemBuilder: (context, idx) {
+        if (idx == 0) {
+          return _AddReviewButton();
+        }
+        final i = idx - 1;
         final r = _mockReviews[i];
         return Container(
           padding: const EdgeInsets.all(16),
@@ -1128,6 +1133,52 @@ class _InfoRow extends StatelessWidget {
           if (isLink)
             const Icon(Icons.call, color: AppColors.primary, size: 18),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Add review button (auth-gated) ───────────────────────────────────────
+
+class _AddReviewButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () async {
+          final ok = await AuthGate.ensureAuthenticated(context);
+          if (!ok || !context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Laisse ton avis après ta prochaine commande 🌟'),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.rate_review_outlined,
+                  color: AppColors.primary, size: 22),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Écrire un avis',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.primary, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

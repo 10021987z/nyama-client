@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/auth_gate.dart';
 import '../../orders/data/orders_repository.dart';
 
 /// Écran 1.8 — Notation post-livraison NYAMA.
@@ -35,6 +36,17 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
   final Set<String> _selectedTags = {};
   final TextEditingController _commentCtrl = TextEditingController();
   int _tipIndex = 1; // 0=none, 1=200, 2=500
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final ok = await AuthGate.ensureAuthenticated(context);
+      if (!ok && mounted) {
+        context.pop();
+      }
+    });
+  }
 
   @override
   void dispose() {

@@ -44,6 +44,10 @@ class _EmailLoginScreenState extends ConsumerState<EmailLoginScreen> {
           _showEmailVerificationDialog(context, _emailCtrl.text.trim());
           return;
         }
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+          return;
+        }
         SecureStorage.getQuartier().then((q) {
           if (!context.mounted) return;
           if (q != null && q.isNotEmpty) {

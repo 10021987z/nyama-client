@@ -149,12 +149,17 @@ class _OtpVerificationScreenState
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authStateProvider, (prev, next) {
       if (next.status == AuthStatus.authenticated) {
+        TextInput.finishAutofillContext();
         if (next.isNewUser) {
-          TextInput.finishAutofillContext();
           context.go('/welcome');
           return;
         }
-        TextInput.finishAutofillContext();
+        // Si on a été poussé depuis un AuthGate (bottom sheet), pop(true)
+        // pour que l'appelant puisse continuer son flux.
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+          return;
+        }
         SecureStorage.getQuartier().then((q) {
           if (!context.mounted) return;
           if (q != null && q.isNotEmpty) {
