@@ -7,6 +7,7 @@ import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/phone_input_screen.dart';
 import 'features/auth/screens/otp_verification_screen.dart';
+import 'features/auth/screens/email_login_screen.dart';
 import 'features/auth/screens/quartier_selection_screen.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
@@ -41,6 +42,10 @@ class App extends StatelessWidget {
       GoRoute(
         path: '/onboarding/quartier',
         builder: (c, s) => const QuartierSelectionScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/email',
+        builder: (c, s) => const EmailLoginScreen(),
       ),
       // ── Aliases (compat ancien code) ──────────────────────────────────
       GoRoute(path: '/phone', builder: (c, s) => const PhoneInputScreen()),

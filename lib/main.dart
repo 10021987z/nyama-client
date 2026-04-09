@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'app.dart';
 import 'core/network/connectivity_notifier.dart';
 import 'core/services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase core init (Auth + Messaging). No-op si google-services.json absent.
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('[Firebase] init skipped: $e');
+  }
 
   // Firebase Cloud Messaging — no-op silencieux si google-services.json absent
   await PushNotificationService.instance.init();

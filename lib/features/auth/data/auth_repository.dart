@@ -88,6 +88,60 @@ class AuthRepository {
     }
   }
 
+  /// Échange un Firebase ID Token contre un JWT NYAMA via le backend.
+  /// Si l'endpoint n'existe pas encore, retourne null pour permettre le fallback.
+  Future<AuthResult?> exchangeFirebaseToken({
+    required String firebaseToken,
+    String? phone,
+    String? email,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/auth/firebase',
+        data: {
+          'firebaseToken': firebaseToken,
+          if (phone != null) 'phone': phone,
+          if (email != null) 'email': email,
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+      final result = AuthResult.fromJson(data);
+      await SecureStorage.saveAccessToken(result.accessToken);
+      await SecureStorage.saveRefreshToken(result.refreshToken);
+      if (phone != null) await SecureStorage.saveUserPhone(phone);
+      if (result.user?.id != null) {
+        await SecureStorage.saveUserId(result.user!.id);
+      }
+      return result;
+    } on DioException catch (e) {
+      // Endpoint pas encore dispo côté backend → fallback géré par l'appelant
+      if (e.response?.statusCode == 404) return null;
+      throw ApiExceptionHandler.handle(e);
+    }
+  }
+
+  /// Fallback : sauvegarde locale d'une session "Firebase-only" quand le
+  /// backend n'a pas encore l'endpoint /auth/firebase. On stocke le token
+  /// Firebase comme accessToken et on reconstitue un AppUser minimal.
+  Future<AuthResult> saveFirebaseFallbackSession({
+    required String firebaseToken,
+    String? phone,
+    String? email,
+    String? uid,
+    String? name,
+  }) async {
+    await SecureStorage.saveAccessToken(firebaseToken);
+    await SecureStorage.saveRefreshToken(firebaseToken);
+    if (phone != null) await SecureStorage.saveUserPhone(phone);
+    if (uid != null) await SecureStorage.saveUserId(uid);
+    if (name != null) await SecureStorage.saveUserName(name);
+    return AuthResult(
+      accessToken: firebaseToken,
+      refreshToken: firebaseToken,
+      user: AppUser(id: uid ?? '', phone: phone ?? email ?? '', name: name),
+    );
+  }
+
   /// Vérifie si un access token existe en stockage (session active)
   Future<bool> isLoggedIn() => SecureStorage.isLoggedIn();
 

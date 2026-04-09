@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "284015197836",
+    "project_id": "nyama-42138",
+    "storage_bucket": "nyama-42138.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284015197836:android:6ad060e200efcb506085a9",
+        "android_client_info": {
+          "package_name": "cm.nyama.nyama_client"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "284015197836-nq3kfr2d6ovlsg0i6t89fqv36fekphnq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyuBJO_qD4eY-phDA11GXY_nMhwl_3yRo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "284015197836-nq3kfr2d6ovlsg0i6t89fqv36fekphnq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

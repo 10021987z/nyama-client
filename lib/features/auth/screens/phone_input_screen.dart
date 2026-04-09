@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
@@ -46,6 +47,17 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
     ref.listen<AuthState>(authStateProvider, (prev, next) {
       if (next.status == AuthStatus.otpSent && next.phone != null) {
         context.go('/onboarding/otp', extra: next.phone);
+      }
+      if (next.status == AuthStatus.authenticated) {
+        // Google / Email success → route vers quartier ou home
+        SecureStorage.getQuartier().then((q) {
+          if (!context.mounted) return;
+          if (q != null && q.isNotEmpty) {
+            context.go('/home');
+          } else {
+            context.go('/onboarding/quartier');
+          }
+        });
       }
     });
 
@@ -276,6 +288,90 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
 
                 const SizedBox(height: 24),
 
+                // ── Séparateur ───────────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 1,
+                        color:
+                            AppColors.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    Padding(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'ou continuer avec',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        height: 1,
+                        color:
+                            AppColors.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ── Boutons Google + Email ───────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SocialButton(
+                        label: 'Google',
+                        icon: _GoogleG(),
+                        onTap: isLoading
+                            ? null
+                            : () async {
+                                await ref
+                                    .read(authStateProvider.notifier)
+                                    .signInWithGoogle();
+                                if (!context.mounted) return;
+                                final st =
+                                    ref.read(authStateProvider);
+                                if (st.status == AuthStatus.error &&
+                                    st.errorMessage != null) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
+                                    SnackBar(
+                                      content: Text(st.errorMessage!),
+                                      backgroundColor:
+                                          AppColors.errorRed,
+                                      behavior:
+                                          SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SocialButton(
+                        label: 'Email',
+                        icon: const Icon(
+                          Icons.email_outlined,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
+                        onTap: isLoading
+                            ? null
+                            : () =>
+                                context.push('/onboarding/email'),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
                 Center(
                   child: RichText(
                     textAlign: TextAlign.center,
@@ -302,6 +398,81 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  final String label;
+  final Widget icon;
+  final VoidCallback? onTap;
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Center(child: icon),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.charcoal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleG extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [Color(0xFF4285F4), Color(0xFFEA4335)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: const Text(
+        'G',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
         ),
       ),
     );
