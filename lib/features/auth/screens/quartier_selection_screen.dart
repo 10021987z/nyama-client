@@ -78,27 +78,48 @@ class _QuartierSelectionScreenState extends State<QuartierSelectionScreen>
     if (_locating) return;
     setState(() => _locating = true);
     try {
+      // 1) Service GPS activé ?
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showError('Service de localisation désactivé');
+        _showError('Active le GPS dans les paramètres');
+        await Geolocator.openLocationSettings();
         return;
       }
+
+      // 2) Permissions
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied) {
+          _showError('Permission de localisation refusée');
+          return;
+        }
       }
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
-        _showError('Permission GPS refusée');
+      if (perm == LocationPermission.deniedForever) {
+        _showError('Active la localisation dans les paramètres');
+        await Geolocator.openAppSettings();
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+
+      // 3) Position (timeout 15s)
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 15),
+      );
+
       final q = _reverseGeocode(pos.latitude, pos.longitude);
       await SecureStorage.saveQuartier(q.city, q.name);
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Position trouvée : ${q.city}, ${q.name}'),
+          backgroundColor: AppColors.forestGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       context.go('/home');
-    } catch (_) {
-      _showError('Impossible de récupérer la position');
+    } catch (e) {
+      _showError('Erreur GPS: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _locating = false);
     }

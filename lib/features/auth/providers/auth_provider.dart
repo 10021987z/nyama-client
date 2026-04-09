@@ -301,12 +301,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _parseError(Object e) {
-    final msg = e.toString();
-    // Retire le préfixe Exception/ApiException pour afficher proprement
-    if (msg.contains(':')) {
-      return msg.split(':').skip(1).join(':').trim();
-    }
-    return msg;
+    // Affiche l'erreur EXACTE pour faciliter le debug (Firebase, réseau, etc.)
+    return 'Erreur: ${e.toString()}';
   }
 }
 

@@ -232,8 +232,9 @@ class _OtpVerificationScreenState
               ),
               const SizedBox(height: 32),
 
-              // ── 6 OTP fields ────────────────────────────────────
-              Row(
+              // ── 6 OTP fields (avec SMS autofill natif) ──────────
+              AutofillGroup(
+                child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(_otpLength, (i) {
                   final focused = _nodes[i].hasFocus;
@@ -274,10 +275,14 @@ class _OtpVerificationScreenState
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                       ],
+                      autofillHints: i == 0
+                          ? const [AutofillHints.oneTimeCode]
+                          : null,
                       onChanged: (v) => _onChanged(i, v),
                     ),
                   );
                 }),
+              ),
               ),
 
               if (hasError && authState.errorMessage != null) ...[

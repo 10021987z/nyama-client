@@ -12,8 +12,9 @@ void main() async {
   // Firebase core init (Auth + Messaging). No-op si google-services.json absent.
   try {
     await Firebase.initializeApp();
+    debugPrint('✅ Firebase initialisé avec succès');
   } catch (e) {
-    debugPrint('[Firebase] init skipped: $e');
+    debugPrint('❌ Firebase init error: $e');
   }
 
   // Firebase Cloud Messaging — no-op silencieux si google-services.json absent
