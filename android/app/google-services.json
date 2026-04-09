@@ -33,6 +33,64 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284015197836:android:cb0c81a0d9f6ec716085a9",
+        "android_client_info": {
+          "package_name": "cm.nyama.nyama_pro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "284015197836-nq3kfr2d6ovlsg0i6t89fqv36fekphnq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyuBJO_qD4eY-phDA11GXY_nMhwl_3yRo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "284015197836-nq3kfr2d6ovlsg0i6t89fqv36fekphnq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284015197836:android:d6ca95527b92d92c6085a9",
+        "android_client_info": {
+          "package_name": "cm.nyama.nyama_rider"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "284015197836-nq3kfr2d6ovlsg0i6t89fqv36fekphnq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyuBJO_qD4eY-phDA11GXY_nMhwl_3yRo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "284015197836-nq3kfr2d6ovlsg0i6t89fqv36fekphnq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"
