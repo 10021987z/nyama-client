@@ -34,8 +34,11 @@ dependencies:
   # GPS
   geolocator: ^12.0.0
 
-  # Carte suivi livreur
-  google_maps_flutter: ^2.6.0
+  # Carte suivi livreur + sélection adresse
+  google_maps_flutter: ^2.9.0
+
+  # HTTP pour Google Places API
+  http: ^1.2.0
 
   # Skeleton loaders
   shimmer: ^3.0.0

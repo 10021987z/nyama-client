@@ -149,14 +149,62 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
         hasDest ? LatLng(order.delivery.lat!, order.delivery.lng!)
                 : const LatLng(4.0503, 9.7679);
 
-    if (_markers.every((m) => m.markerId.value != 'destination')) {
+    // Position du restaurant (mock — à remplacer par les vraies données)
+    const restaurantLatLng = LatLng(4.0445, 9.6966);
+
+    // Point milieu pour le livreur (simulation)
+    final riderLatLng = LatLng(
+      (restaurantLatLng.latitude + destLatLng.latitude) / 2,
+      (restaurantLatLng.longitude + destLatLng.longitude) / 2,
+    );
+
+    // Marqueur restaurant (orange)
+    _markers.removeWhere((m) => m.markerId.value == 'restaurant');
+    _markers.add(Marker(
+      markerId: const MarkerId('restaurant'),
+      position: restaurantLatLng,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      infoWindow: InfoWindow(
+        title: order.items.isNotEmpty ? order.items.first.name : 'Restaurant',
+      ),
+    ));
+
+    // Marqueur client (vert)
+    _markers.removeWhere((m) => m.markerId.value == 'destination');
+    _markers.add(Marker(
+      markerId: const MarkerId('destination'),
+      position: destLatLng,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      infoWindow: const InfoWindow(title: 'Chez vous'),
+    ));
+
+    // Marqueur livreur (bleu) — au milieu du trajet par défaut
+    if (_markers.every((m) => m.markerId.value != 'rider')) {
       _markers.add(Marker(
-        markerId: const MarkerId('destination'),
-        position: destLatLng,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: const InfoWindow(title: 'Chez vous'),
+        markerId: const MarkerId('rider'),
+        position: riderLatLng,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        infoWindow: const InfoWindow(title: 'Kevin — En route'),
       ));
     }
+
+    // Polyline restaurant → livreur → client
+    final riderPos = _markers
+        .firstWhere((m) => m.markerId.value == 'rider')
+        .position;
+    _polylines
+      ..clear()
+      ..add(Polyline(
+        polylineId: const PolylineId('route'),
+        points: [restaurantLatLng, riderPos, destLatLng],
+        color: AppColors.primary,
+        width: 4,
+        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+      ));
+
+    // Calcul du centre pour la caméra
+    final centerLat = (restaurantLatLng.latitude + destLatLng.latitude) / 2;
+    final centerLng = (restaurantLatLng.longitude + destLatLng.longitude) / 2;
 
     final currentStatus = _liveStatus ?? order.status;
     final etaMin = _eta.difference(DateTime.now()).inMinutes.clamp(0, 999);
@@ -172,12 +220,34 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
               Positioned.fill(
                 child: GoogleMap(
                   initialCameraPosition: CameraPosition(
-                    target: destLatLng,
-                    zoom: 14,
+                    target: LatLng(centerLat, centerLng),
+                    zoom: 13,
                   ),
                   markers: Set.from(_markers),
                   polylines: Set.from(_polylines),
-                  onMapCreated: (c) => _mapController = c,
+                  onMapCreated: (c) {
+                    _mapController = c;
+                    // Ajuste la vue pour inclure tous les points
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      final bounds = LatLngBounds(
+                        southwest: LatLng(
+                          [restaurantLatLng.latitude, destLatLng.latitude, riderPos.latitude]
+                              .reduce((a, b) => a < b ? a : b),
+                          [restaurantLatLng.longitude, destLatLng.longitude, riderPos.longitude]
+                              .reduce((a, b) => a < b ? a : b),
+                        ),
+                        northeast: LatLng(
+                          [restaurantLatLng.latitude, destLatLng.latitude, riderPos.latitude]
+                              .reduce((a, b) => a > b ? a : b),
+                          [restaurantLatLng.longitude, destLatLng.longitude, riderPos.longitude]
+                              .reduce((a, b) => a > b ? a : b),
+                        ),
+                      );
+                      c.animateCamera(
+                        CameraUpdate.newLatLngBounds(bounds, 60),
+                      );
+                    });
+                  },
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
                   mapToolbarEnabled: false,
