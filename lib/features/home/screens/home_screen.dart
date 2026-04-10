@@ -13,6 +13,7 @@ import '../../cart/screens/cart_screen.dart';
 import '../../orders/screens/orders_list_screen.dart';
 import '../../profile/screens/profile_screen.dart';
 import '../../search/screens/search_screen.dart';
+import '../../home/providers/home_provider.dart';
 import 'home_tab.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -47,6 +48,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setupSocket();
       initLanguage(ref);
+      ref.listenManual(selectedTabProvider, (_, next) {
+        if (mounted && next != _currentIndex) {
+          setState(() => _currentIndex = next);
+        }
+      });
     });
   }
 
@@ -111,6 +117,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
     if (!mounted) return;
     setState(() => _currentIndex = i);
+    ref.read(selectedTabProvider.notifier).state = i;
   }
 
   void _setupSocket() {

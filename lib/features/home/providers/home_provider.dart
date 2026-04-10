@@ -9,6 +9,10 @@ final homeRepositoryProvider = Provider<HomeRepository>((ref) {
   return HomeRepository();
 });
 
+// ─── Tab index (permet aux enfants de changer d'onglet) ─────────────────
+
+final selectedTabProvider = StateProvider<int>((ref) => 0);
+
 // ─── State: catégorie filtrée active ─────────────────────────────────────
 
 final selectedCategoryProvider = StateProvider<String?>((ref) => null);

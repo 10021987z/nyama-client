@@ -11,6 +11,7 @@ import 'features/auth/screens/email_login_screen.dart';
 import 'features/auth/screens/welcome_screen.dart';
 import 'features/auth/screens/quartier_selection_screen.dart';
 import 'features/home/screens/home_screen.dart';
+import 'features/home/data/models/menu_item.dart';
 import 'features/restaurant/screens/dish_detail_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
@@ -19,6 +20,7 @@ import 'features/payment/data/checkout_data.dart';
 import 'features/payment/screens/payment_screen.dart';
 import 'features/rating/screens/rating_screen.dart';
 import 'features/rider_signup/screens/rider_signup_screen.dart';
+import 'features/search/screens/map_view_screen.dart';
 
 class App extends StatelessWidget {
   App({super.key});
@@ -82,11 +84,19 @@ class App extends StatelessWidget {
         builder: (c, s) => const HomeScreen(initialTab: 4),
       ),
 
+      // ── Carte restaurants ────────────────────────────────────────────
+      GoRoute(
+        path: '/search/map',
+        builder: (c, s) => const MapViewScreen(),
+      ),
+
       // ── Détails ───────────────────────────────────────────────────────
       GoRoute(
         path: '/dish/:id',
-        builder: (c, s) =>
-            DishDetailScreen(dishId: s.pathParameters['id']!),
+        builder: (c, s) => DishDetailScreen(
+          dishId: s.pathParameters['id']!,
+          menuItem: s.extra is MenuItem ? s.extra as MenuItem : null,
+        ),
       ),
       GoRoute(
         path: '/restaurant/:id',

@@ -315,13 +315,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vue carte bientôt disponible'),
-                    ),
-                  );
-                },
+                onTap: () => context.push('/search/map'),
                 child: Text(
                   'Voir la Carte',
                   style: TextStyle(fontFamily: 'NunitoSans',
@@ -338,17 +332,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             children: [
               Expanded(
                 child: _RegionCard(
-                  label: 'Littoral',
+                  label: 'Douala',
                   color: AppColors.primary,
-                  onTap: () => _search('Littoral'),
+                  onTap: () => _search('Douala'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _RegionCard(
-                  label: 'Centre',
+                  label: 'Yaoundé',
                   color: AppColors.terracotta,
-                  onTap: () => _search('Centre'),
+                  onTap: () => _search('Yaoundé'),
                 ),
               ),
             ],
@@ -905,9 +899,7 @@ class _MenuResultTile extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 13),
       ),
-      onTap: item.cook != null
-          ? () => context.go('/restaurant/${item.cook!.id}')
-          : null,
+      onTap: () => context.push('/dish/${item.id}', extra: item),
     );
   }
 }

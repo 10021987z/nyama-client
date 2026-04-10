@@ -14,7 +14,8 @@ import '../../home/providers/home_provider.dart';
 
 class DishDetailScreen extends ConsumerStatefulWidget {
   final String dishId;
-  const DishDetailScreen({super.key, required this.dishId});
+  final MenuItem? menuItem;
+  const DishDetailScreen({super.key, required this.dishId, this.menuItem});
 
   @override
   ConsumerState<DishDetailScreen> createState() => _DishDetailScreenState();
@@ -41,24 +42,39 @@ class _DishDetailScreenState extends ConsumerState<DishDetailScreen> {
     return (basePrice * _portionMultipliers[_portionIdx] * _quantity).round();
   }
 
+  /// Image placeholder par catégorie
+  static String _categoryImage(String? category) {
+    final cat = (category ?? '').toLowerCase();
+    if (cat.contains('grillade') || cat.contains('braisé')) {
+      return 'assets/images/mock/grillades.jpg';
+    } else if (cat.contains('ragout') || cat.contains('sauce')) {
+      return 'assets/images/mock/ragout.jpg';
+    } else if (cat.contains('dessert') || cat.contains('sucré')) {
+      return 'assets/images/mock/dessert.jpg';
+    } else if (cat.contains('rapide') || cat.contains('fast')) {
+      return 'assets/images/mock/rapide.jpg';
+    }
+    return 'assets/images/mock/ndole.jpg';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final menuAsync = ref.watch(filteredMenuItemsProvider);
-    final allItems = menuAsync.maybeWhen(
-      data: (r) => r.data,
-      orElse: () => <MenuItem>[],
-    );
-
-    // Find the dish or use a mock
-    MenuItem? dish;
-    for (final item in allItems) {
-      if (item.id == widget.dishId) {
-        dish = item;
-        break;
+    // Priorité : extra > search in loaded items > mock
+    MenuItem? dish = widget.menuItem;
+    if (dish == null) {
+      final menuAsync = ref.watch(filteredMenuItemsProvider);
+      final allItems = menuAsync.maybeWhen(
+        data: (r) => r.data,
+        orElse: () => <MenuItem>[],
+      );
+      for (final item in allItems) {
+        if (item.id == widget.dishId) {
+          dish = item;
+          break;
+        }
       }
     }
 
-    // Mock fallback
     final name = dish?.name ?? 'Ndolé Viande';
     final description = dish?.description ??
         'Plat traditionnel camerounais à base de feuilles de ndolé, '
@@ -69,6 +85,8 @@ class _DishDetailScreenState extends ConsumerState<DishDetailScreen> {
     final prepTime = dish?.prepTimeMin ?? 25;
     final category = dish?.category ?? 'Plats Traditionnels';
     final imageUrl = dish?.imageUrl;
+    final isAvailable = dish?.canOrder ?? true;
+    final stock = dish?.stockRemaining;
     final totalPrice = _computePrice(basePrice);
 
     return Scaffold(
@@ -246,22 +264,62 @@ class _DishDetailScreenState extends ConsumerState<DishDetailScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Category chip
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            category,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
+                        // Category chip + availability badges
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                category,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (!isAvailable)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.errorRed.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'Indisponible',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.errorRed,
+                                  ),
+                                ),
+                              ),
+                            if (isAvailable && stock != null && stock <= 5)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gold.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'Plus que $stock en stock',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.gold,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
 
                         const SizedBox(height: 28),
@@ -477,7 +535,7 @@ class _DishDetailScreenState extends ConsumerState<DishDetailScreen> {
                     child: SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: !isAvailable ? null : () {
                           for (int i = 0; i < _quantity; i++) {
                             ref.read(cartProvider.notifier).addItem(
                                   CartItem(
@@ -540,23 +598,27 @@ class _DishDetailScreenState extends ConsumerState<DishDetailScreen> {
     );
   }
 
-  Widget _imageFallback() => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF8B4513), Color(0xFFD2691E)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+  Widget _imageFallback() {
+    final dish = widget.menuItem;
+    final assetPath = _categoryImage(dish?.category);
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF8B4513), Color(0xFFD2691E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Image.asset(
-          'assets/images/mock/ndole.jpg',
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => const Center(
-            child: Icon(Icons.restaurant_menu,
-                size: 64, color: Colors.white54),
-          ),
+      ),
+      child: Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const Center(
+          child: Icon(Icons.restaurant_menu,
+              size: 64, color: Colors.white54),
         ),
-      );
+      ),
+    );
+  }
 
   String _spiceLabel(double v) => switch (v.round()) {
         0 => 'Aucun',

@@ -538,56 +538,192 @@ class ProfileScreen extends ConsumerWidget {
       );
       return;
     }
+
+    // Valeurs locales pour le sheet
+    String autoLock = '30s';
+    bool paymentSecurity = true;
+
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceWhite,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.fingerprint,
-                    size: 56, color: AppColors.primary),
-                const SizedBox(height: 12),
-                const Text(
-                  'Sécurité biométrique',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.charcoal,
+          return SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                24, 24, 24, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textTertiary.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  "Protège l'ouverture de l'app et les paiements avec ton empreinte.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
+                  const SizedBox(height: 20),
+                  const Icon(Icons.fingerprint,
+                      size: 56, color: AppColors.primary),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Sécurité biométrique',
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.charcoal,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile.adaptive(
-                  value: enabled,
-                  activeThumbColor: AppColors.primary,
-                  title: const Text('Activer la biométrie'),
-                  onChanged: (v) async {
-                    if (v) {
-                      final ok = await BiometricService.instance
-                          .authenticate(
-                              reason: 'Confirme pour activer la biométrie');
-                      if (!ok) return;
-                    }
-                    await SecureStorage.setBiometricEnabled(v);
-                    setLocal(() => enabled = v);
-                  },
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  const Text(
+                    "Protège l'ouverture de l'app et les paiements avec ton empreinte.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'NunitoSans',
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Toggle biométrie
+                  _BiometricOptionTile(
+                    icon: Icons.fingerprint,
+                    title: 'Empreinte digitale',
+                    subtitle: enabled ? 'Activée' : 'Désactivée',
+                    trailing: Switch.adaptive(
+                      value: enabled,
+                      activeColor: AppColors.primary,
+                      onChanged: (v) async {
+                        if (v) {
+                          final ok = await BiometricService.instance
+                              .authenticate(
+                                  reason: 'Confirme pour activer la biométrie');
+                          if (!ok) return;
+                        }
+                        await SecureStorage.setBiometricEnabled(v);
+                        setLocal(() => enabled = v);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Verrouillage auto
+                  _BiometricOptionTile(
+                    icon: Icons.lock_clock,
+                    title: 'Verrouillage auto',
+                    subtitle: 'Après $autoLock d\'inactivité',
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: DropdownButton<String>(
+                        value: autoLock,
+                        underline: const SizedBox(),
+                        style: const TextStyle(
+                          fontFamily: 'NunitoSans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.charcoal,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: '0', child: Text('Immédiat')),
+                          DropdownMenuItem(value: '30s', child: Text('30 sec')),
+                          DropdownMenuItem(value: '1min', child: Text('1 min')),
+                          DropdownMenuItem(value: '5min', child: Text('5 min')),
+                        ],
+                        onChanged: enabled
+                            ? (v) => setLocal(() => autoLock = v!)
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Sécurité paiement
+                  _BiometricOptionTile(
+                    icon: Icons.payment,
+                    title: 'Sécurité paiement',
+                    subtitle: 'Confirmer chaque paiement par empreinte',
+                    trailing: Switch.adaptive(
+                      value: paymentSecurity,
+                      activeColor: AppColors.forestGreen,
+                      onChanged: enabled
+                          ? (v) => setLocal(() => paymentSecurity = v)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Appareils connectés
+                  _BiometricOptionTile(
+                    icon: Icons.devices,
+                    title: 'Appareils connectés',
+                    subtitle: '1 appareil actif',
+                    trailing: const Icon(Icons.chevron_right,
+                        color: AppColors.textTertiary, size: 20),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Gestion des appareils bientôt disponible'),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Reset button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await SecureStorage.setBiometricEnabled(false);
+                        setLocal(() {
+                          enabled = false;
+                          paymentSecurity = true;
+                          autoLock = '30s';
+                        });
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Paramètres de sécurité réinitialisés'),
+                            backgroundColor: AppColors.primary,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.restart_alt, size: 18),
+                      label: const Text(
+                        'Réinitialiser les paramètres',
+                        style: TextStyle(
+                          fontFamily: 'NunitoSans',
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.errorRed,
+                        side: BorderSide(
+                          color: AppColors.errorRed.withValues(alpha: 0.3),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -851,6 +987,77 @@ class _PaymentMethodTile extends StatelessWidget {
           const Icon(Icons.chevron_right,
               color: AppColors.textTertiary, size: 20),
         ],
+      ),
+    );
+  }
+}
+
+class _BiometricOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  const _BiometricOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'NunitoSans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.charcoal,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontFamily: 'NunitoSans',
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            trailing,
+          ],
+        ),
       ),
     );
   }

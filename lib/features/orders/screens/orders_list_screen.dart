@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/fcfa_formatter.dart';
+import '../../home/providers/home_provider.dart';
 import '../data/models/order_models.dart';
 import '../providers/orders_provider.dart';
 
@@ -67,7 +68,7 @@ class _OrdersListScreenState extends ConsumerState<OrdersListScreen>
   }
 }
 
-class _OrdersTab extends StatelessWidget {
+class _OrdersTab extends ConsumerWidget {
   final AsyncValue<List<OrderModel>> asyncOrders;
   final VoidCallback onRefresh;
   final String emptyMessage;
@@ -81,7 +82,7 @@ class _OrdersTab extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return asyncOrders.when(
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
@@ -125,7 +126,9 @@ class _OrdersTab extends StatelessWidget {
                         color: AppColors.textSecondary, fontSize: 14)),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () {
+                    ref.read(selectedTabProvider.notifier).state = 0;
+                  },
                   icon: const Icon(Icons.restaurant_menu, size: 18),
                   label: const Text('Explorer les plats'),
                   style: ElevatedButton.styleFrom(

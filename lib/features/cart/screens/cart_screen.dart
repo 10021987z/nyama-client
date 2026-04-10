@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/l10n/translations.dart';
 import '../../../core/services/auth_gate.dart';
 import '../../../core/utils/fcfa_formatter.dart';
+import '../../home/providers/home_provider.dart';
 import '../../payment/data/checkout_data.dart';
 import '../providers/cart_provider.dart';
 
@@ -579,7 +580,9 @@ class _EmptyCart extends ConsumerWidget {
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () {
+                    ref.read(selectedTabProvider.notifier).state = 0;
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
