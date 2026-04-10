@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/l10n/translations.dart';
 import '../../../core/network/socket_provider.dart';
 import '../../../core/services/auth_gate.dart';
 import '../../../core/services/biometric_service.dart';
@@ -43,7 +44,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     _currentIndex = widget.initialTab;
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupSocket();
+      initLanguage(ref);
+    });
   }
 
   @override

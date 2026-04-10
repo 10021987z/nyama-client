@@ -11,6 +11,7 @@ import 'features/auth/screens/email_login_screen.dart';
 import 'features/auth/screens/welcome_screen.dart';
 import 'features/auth/screens/quartier_selection_screen.dart';
 import 'features/home/screens/home_screen.dart';
+import 'features/restaurant/screens/dish_detail_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
 import 'features/orders/screens/order_tracking_screen.dart';
@@ -82,6 +83,11 @@ class App extends StatelessWidget {
       ),
 
       // ── Détails ───────────────────────────────────────────────────────
+      GoRoute(
+        path: '/dish/:id',
+        builder: (c, s) =>
+            DishDetailScreen(dishId: s.pathParameters['id']!),
+      ),
       GoRoute(
         path: '/restaurant/:id',
         builder: (c, s) =>

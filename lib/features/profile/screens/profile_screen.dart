@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/l10n/translations.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -51,7 +52,7 @@ class ProfileScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _buildReferralBlock(),
                   const SizedBox(height: 20),
-                  _buildMenuItems(context),
+                  _buildMenuItems(context, ref),
                   const SizedBox(height: 12),
                   _buildLogout(context, ref),
                   const SizedBox(height: 16),
@@ -429,7 +430,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuItems(BuildContext context) {
+  Widget _buildMenuItems(BuildContext context, WidgetRef ref) {
     final items = <_MenuEntry>[
       _MenuEntry(Icons.notifications_none, 'Notifications',
           onTap: () => _showNotificationsSheet(context)),
@@ -439,8 +440,8 @@ class ProfileScreen extends ConsumerWidget {
           onTap: () => context.go('/orders')),
       _MenuEntry(Icons.payments_outlined, 'Moyens de paiement (MoMo/OM)',
           onTap: () => _showPaymentMethodsSheet(context)),
-      _MenuEntry(Icons.language, 'Langue (Français/Pidgin)',
-          onTap: () => _showLanguageDialog(context)),
+      _MenuEntry(Icons.language, '${t('language', ref)} (FR/EN/Pidgin)',
+          onTap: () => _showLanguageDialog(context, ref)),
       _MenuEntry(Icons.fingerprint, 'Sécurité biométrique',
           onTap: () => _showBiometricSheet(context)),
       _MenuEntry(Icons.help_outline, 'Support & Aide',
@@ -739,8 +740,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showLanguageDialog(BuildContext context) async {
-    final current = (await SecureStorage.getLanguage()) ?? 'fr';
+  Future<void> _showLanguageDialog(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(languageProvider);
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -748,7 +749,7 @@ class ProfileScreen extends ConsumerWidget {
         String selected = current;
         return StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
-            title: const Text('Choisir la langue'),
+            title: Text(t('choose_language', ref)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -766,32 +767,36 @@ class ProfileScreen extends ConsumerWidget {
                   title: const Text('English'),
                   onChanged: (v) => setLocal(() => selected = v!),
                 ),
-                const ListTile(
-                  enabled: false,
-                  leading: Icon(Icons.lock_outline,
-                      size: 18, color: AppColors.textTertiary),
-                  title: Text('Pidgin'),
-                  subtitle: Text('Bientôt disponible'),
+                RadioListTile<String>(
+                  value: 'pidgin',
+                  groupValue: selected,
+                  activeColor: AppColors.primary,
+                  title: const Text('Pidgin'),
+                  onChanged: (v) => setLocal(() => selected = v!),
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Annuler'),
+                child: Text(t('cancel', ref)),
               ),
               TextButton(
                 onPressed: () async {
                   await SecureStorage.saveLanguage(selected);
+                  ref.read(languageProvider.notifier).state = selected;
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
-                  final label =
-                      selected == 'en' ? 'English' : 'Français';
+                  final label = switch (selected) {
+                    'en' => 'English',
+                    'pidgin' => 'Pidgin',
+                    _ => 'Français',
+                  };
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Langue changée en $label')),
+                    SnackBar(content: Text('${t('language_changed', ref)} $label')),
                   );
                 },
-                child: const Text('Valider'),
+                child: Text(t('validate', ref)),
               ),
             ],
           ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/l10n/translations.dart';
 import '../../../core/services/auth_gate.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/fcfa_formatter.dart';
@@ -303,20 +304,19 @@ class _HomeTabState extends ConsumerState<HomeTab>
               const SizedBox(height: 20),
               const _DailyBanner(),
               const SizedBox(height: 28),
-              const _SectionHeader(title: 'Catégories', action: 'Tout voir'),
+              _SectionHeader(title: t('categories', ref), action: t('see_all', ref)),
               const SizedBox(height: 12),
               _CategoryChips(
                 active: _activeCategory,
                 onTap: (c) => setState(() => _activeCategory = c),
               ),
               const SizedBox(height: 28),
-              const _SectionHeader(title: 'Restaurants près de toi'),
+              _SectionHeader(title: t('restaurants_nearby', ref)),
               const SizedBox(height: 12),
               _RestaurantsRow(cooks: cooks),
               const SizedBox(height: 28),
-              const _SectionHeader(
-                  title: 'Plats populaires',
-                  action: 'Le goût de chez nous'),
+              _SectionHeader(
+                  title: t('popular_dishes', ref)),
               const SizedBox(height: 16),
               _PopularGrid(items: menu, activeCategory: _activeCategory),
             ],
@@ -379,9 +379,9 @@ class _Header extends ConsumerWidget {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text(
-                    'Se connecter',
-                    style: TextStyle(
+                  child: Text(
+                    t('login', ref),
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: _kOrange,
@@ -441,9 +441,9 @@ class _Header extends ConsumerWidget {
                   GestureDetector(
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Pas de nouvelles notifications'),
-                          duration: Duration(seconds: 2),
+                        SnackBar(
+                          content: Text(t('no_notifications', ref)),
+                          duration: const Duration(seconds: 2),
                         ),
                       );
                     },
@@ -482,11 +482,11 @@ class _Header extends ConsumerWidget {
 }
 
 // ─── Search bar ────────────────────────────────────────────────────────────
-class _SearchBar extends StatelessWidget {
+class _SearchBar extends ConsumerWidget {
   const _SearchBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: _kHPad),
       child: GestureDetector(
@@ -506,7 +506,7 @@ class _SearchBar extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Cherche un plat, un restaurant...',
+                  t('search_placeholder', ref),
                   style: TextStyle(
                     fontSize: 14,
                     color: _kMuted.withValues(alpha: 0.5),
@@ -522,11 +522,11 @@ class _SearchBar extends StatelessWidget {
 }
 
 // ─── Daily banner ──────────────────────────────────────────────────────────
-class _DailyBanner extends StatelessWidget {
+class _DailyBanner extends ConsumerWidget {
   const _DailyBanner();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: _kHPad),
       child: GestureDetector(
@@ -570,15 +570,15 @@ class _DailyBanner extends StatelessWidget {
                   color: _kRed,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.local_fire_department,
+                    const Icon(Icons.local_fire_department,
                         size: 12, color: _kWhite),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
-                      'DU JOUR',
-                      style: TextStyle(
+                      t('du_jour', ref),
+                      style: const TextStyle(
                         fontFamily: 'Montserrat',
                         color: _kWhite,
                         fontSize: 10,
@@ -918,7 +918,7 @@ class _PopularGrid extends ConsumerWidget {
   final String activeCategory;
   const _PopularGrid({required this.items, required this.activeCategory});
 
-  void _showAddedSnack(BuildContext context, String name) {
+  void _showAddedSnack(BuildContext context, WidgetRef ref, String name) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -927,7 +927,7 @@ class _PopularGrid extends ConsumerWidget {
             children: [
               const Icon(Icons.check_circle, color: _kWhite, size: 18),
               const SizedBox(width: 8),
-              Expanded(child: Text('$name ajouté au panier !')),
+              Expanded(child: Text('$name ${t('added_to_cart', ref)}')),
             ],
           ),
           backgroundColor: _kForest,
@@ -950,7 +950,7 @@ class _PopularGrid extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: _kHPad, vertical: 24),
         child: Center(
           child: Text(
-            'Aucun plat dans cette catégorie',
+            t('no_category', ref),
             style: TextStyle(color: _kMuted.withValues(alpha: 0.8)),
           ),
         ),
@@ -978,7 +978,7 @@ class _PopularGrid extends ConsumerWidget {
               priceXaf: m.price,
               gradient: m.gradient,
               imageAsset: m.image,
-              onTap: () => context.push('/restaurant/$cookId'),
+              onTap: () => context.push('/dish/mock-${m.name}'),
               onAdd: () {
                 ref.read(cartProvider.notifier).addItem(
                       CartItem(
@@ -990,7 +990,7 @@ class _PopularGrid extends ConsumerWidget {
                         cookName: 'Maman Catherine',
                       ),
                     );
-                _showAddedSnack(context, m.name);
+                _showAddedSnack(context, ref, m.name);
               },
             );
           }
@@ -1001,9 +1001,7 @@ class _PopularGrid extends ConsumerWidget {
             priceXaf: it.priceXaf,
             gradient: _dishGradients[i % _dishGradients.length],
             imageAsset: _mockDishes[i % _mockDishes.length].image,
-            onTap: cookId.isEmpty
-                ? null
-                : () => context.push('/restaurant/$cookId'),
+            onTap: () => context.push('/dish/${it.id}'),
             onAdd: () {
               ref.read(cartProvider.notifier).addItem(
                     CartItem(
@@ -1016,7 +1014,7 @@ class _PopularGrid extends ConsumerWidget {
                       imageUrl: it.imageUrl,
                     ),
                   );
-              _showAddedSnack(context, it.name);
+              _showAddedSnack(context, ref, it.name);
             },
           );
         },

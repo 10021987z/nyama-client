@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/l10n/translations.dart';
 import '../../../core/services/auth_gate.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../payment/data/checkout_data.dart';
@@ -41,8 +42,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleSpacing: 16,
-        title: const Text(
-          'Mon Panier',
+        title: Text(
+          t('my_cart', ref),
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontSize: 20,
@@ -501,11 +502,11 @@ class _OrderCta extends StatelessWidget {
 
 // ─── Empty ────────────────────────────────────────────────────────────────
 
-class _EmptyCart extends StatelessWidget {
+class _EmptyCart extends ConsumerWidget {
   const _EmptyCart();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -534,8 +535,8 @@ class _EmptyCart extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Ton estomac gronde pour rien...',
+            Text(
+              t('stomach_grumbles', ref),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Montserrat',
@@ -546,8 +547,8 @@ class _EmptyCart extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
-              "Les meilleurs plats camerounais t'attendent.",
+            Text(
+              t('best_dishes_await', ref),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'NunitoSans',
@@ -589,8 +590,8 @@ class _EmptyCart extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    'Explorer les plats',
+                  child: Text(
+                    t('explore_dishes', ref),
                     style: TextStyle(
                       fontFamily: 'Montserrat',
                       fontSize: 16,

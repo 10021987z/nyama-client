@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/l10n/translations.dart';
 import '../../features/cart/providers/cart_provider.dart';
 import 'cart_bounce_controller.dart';
 
@@ -43,32 +44,32 @@ class NyamaBottomNavBar extends ConsumerWidget {
             children: [
               _NavItem(
                 icon: Icons.home_rounded,
-                label: 'ACCUEIL',
+                label: t('nav_home', ref),
                 isActive: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
                 icon: Icons.search_rounded,
-                label: 'RECHERCHE',
+                label: t('nav_search', ref),
                 isActive: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
               _NavItem(
                 icon: Icons.shopping_bag_outlined,
-                label: 'PANIER',
+                label: t('nav_cart', ref),
                 isActive: currentIndex == 2,
                 badgeCount: cartCount,
                 onTap: () => onTap(2),
               ),
               _NavItem(
                 icon: Icons.receipt_long_rounded,
-                label: 'COMMANDE',
+                label: t('nav_orders', ref),
                 isActive: currentIndex == 3,
                 onTap: () => onTap(3),
               ),
               _NavItem(
                 icon: Icons.person_rounded,
-                label: isAuthenticated ? 'PROFIL' : 'SE CONNECTER',
+                label: isAuthenticated ? t('nav_profile', ref) : t('nav_login', ref),
                 isActive: currentIndex == 4,
                 showDot: !isAuthenticated,
                 onTap: () => onTap(4),

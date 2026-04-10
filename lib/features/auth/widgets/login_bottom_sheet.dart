@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/l10n/translations.dart';
 import '../providers/auth_provider.dart';
 
 /// Bottom sheet de connexion — style Uber Eats / Deliveroo.
@@ -95,20 +96,20 @@ class _LoginBottomSheetState extends ConsumerState<LoginBottomSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Connecte-toi pour continuer',
+              Text(
+                t('sign_in_to_continue', ref),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                   color: AppColors.charcoal,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Pour commander tes plats préférés',
+              Text(
+                t('order_for', ref),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
@@ -128,7 +129,7 @@ class _LoginBottomSheetState extends ConsumerState<LoginBottomSheet> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const _GoogleLogo(),
-                label: 'Continuer avec Google',
+                label: t('continue_google', ref),
                 onTap: _googleLoading ? null : _onGoogle,
               ),
               const SizedBox(height: 12),
@@ -140,7 +141,7 @@ class _LoginBottomSheetState extends ConsumerState<LoginBottomSheet> {
                 borderColor: AppColors.forestGreen,
                 textColor: Colors.white,
                 icon: const Icon(Icons.phone, color: Colors.white, size: 20),
-                label: 'Continuer avec un numéro',
+                label: t('continue_phone', ref),
                 onTap: _onPhone,
               ),
               const SizedBox(height: 12),
@@ -153,23 +154,23 @@ class _LoginBottomSheetState extends ConsumerState<LoginBottomSheet> {
                 textColor: AppColors.charcoal,
                 icon: const Icon(Icons.email_outlined,
                     color: AppColors.charcoal, size: 20),
-                label: 'Continuer avec Email',
+                label: t('continue_email', ref),
                 onTap: _onEmail,
               ),
 
               const Spacer(),
               RichText(
                 textAlign: TextAlign.center,
-                text: const TextSpan(
-                  style: TextStyle(
+                text: TextSpan(
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                   children: [
-                    TextSpan(text: 'En continuant, tu acceptes nos '),
+                    TextSpan(text: t('tos_prefix', ref)),
                     TextSpan(
-                      text: "Conditions d'utilisation",
-                      style: TextStyle(
+                      text: t('tos_link', ref),
+                      style: const TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
