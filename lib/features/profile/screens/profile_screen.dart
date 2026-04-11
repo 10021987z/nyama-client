@@ -15,6 +15,7 @@ import '../../../core/services/push_notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../orders/providers/orders_provider.dart';
+import '../widgets/nyama_drawer.dart';
 
 /// Écran 1.9 — Profil NYAMA+.
 class ProfileScreen extends ConsumerWidget {
@@ -34,9 +35,10 @@ class ProfileScreen extends ConsumerWidget {
         ? user!.name!
         : 'Utilisateur NYAMA';
 
-    return ColoredBox(
-      color: AppColors.creme,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: AppColors.creme,
+      drawer: const NyamaDrawer(),
+      body: SafeArea(
         child: Column(
           children: [
             _buildHeader(context, name),
@@ -79,9 +81,11 @@ class ProfileScreen extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-            onPressed: () {},
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu, color: AppColors.textPrimary),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+            ),
           ),
           const Expanded(
             child: Center(

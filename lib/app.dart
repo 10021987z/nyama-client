@@ -15,7 +15,10 @@ import 'features/home/data/models/menu_item.dart';
 import 'features/restaurant/screens/dish_detail_screen.dart';
 import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
+import 'features/orders/screens/order_history_screen.dart';
 import 'features/orders/screens/order_tracking_screen.dart';
+import 'features/profile/screens/payment_methods_screen.dart';
+import 'features/profile/screens/support_screen.dart';
 import 'features/payment/data/checkout_data.dart';
 import 'features/payment/screens/payment_screen.dart';
 import 'features/rating/screens/rating_screen.dart';
@@ -131,6 +134,20 @@ class App extends StatelessWidget {
         path: '/rating/:orderId',
         builder: (c, s) =>
             RatingScreen(orderId: s.pathParameters['orderId']!),
+      ),
+
+      // ── Profil — sous-écrans ─────────────────────────────────────────
+      GoRoute(
+        path: '/orders/history',
+        builder: (c, s) => const OrderHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/profile/payments',
+        builder: (c, s) => const PaymentMethodsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/support',
+        builder: (c, s) => const SupportScreen(),
       ),
 
       // ── Divers ────────────────────────────────────────────────────────

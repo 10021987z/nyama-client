@@ -102,6 +102,13 @@ class SecureStorage {
         key: _kSearchHistory, value: trimmed.join('\u0001'));
   }
 
+  static Future<void> removeSearchItem(String query) async {
+    final current = await getSearchHistory();
+    current.removeWhere((s) => s.toLowerCase() == query.toLowerCase());
+    await _storage.write(
+        key: _kSearchHistory, value: current.join('\u0001'));
+  }
+
   static Future<void> clearSearchHistory() =>
       _storage.delete(key: _kSearchHistory);
 
@@ -118,6 +125,46 @@ class SecureStorage {
   static Future<bool> isLoggedIn() async {
     final token = await getAccessToken();
     return token != null && token.isNotEmpty;
+  }
+
+  // Moyens de paiement (numéros MoMo/Orange/Falla, séparés par \u0001)
+  // Format: "provider|phoneMasked|isDefault"
+  static const _kPaymentMethods = 'payment_methods';
+
+  static Future<List<String>> getPaymentMethods() async {
+    final raw = await _storage.read(key: _kPaymentMethods);
+    if (raw == null || raw.isEmpty) return [];
+    return raw.split('\u0001').where((s) => s.isNotEmpty).toList();
+  }
+
+  static Future<void> addPaymentMethod(String entry) async {
+    final list = await getPaymentMethods();
+    list.add(entry);
+    await _storage.write(
+        key: _kPaymentMethods, value: list.join('\u0001'));
+  }
+
+  static Future<void> removePaymentMethod(int index) async {
+    final list = await getPaymentMethods();
+    if (index < 0 || index >= list.length) return;
+    list.removeAt(index);
+    await _storage.write(
+        key: _kPaymentMethods, value: list.join('\u0001'));
+  }
+
+  static Future<void> setDefaultPaymentMethod(int index) async {
+    final list = await getPaymentMethods();
+    if (index < 0 || index >= list.length) return;
+    final updated = <String>[];
+    for (var i = 0; i < list.length; i++) {
+      final parts = list[i].split('|');
+      if (parts.length < 2) continue;
+      final provider = parts[0];
+      final phone = parts[1];
+      updated.add('$provider|$phone|${i == index ? '1' : '0'}');
+    }
+    await _storage.write(
+        key: _kPaymentMethods, value: updated.join('\u0001'));
   }
 
   // Efface tout (déconnexion)
