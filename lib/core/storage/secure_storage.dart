@@ -167,6 +167,43 @@ class SecureStorage {
         key: _kPaymentMethods, value: updated.join('\u0001'));
   }
 
+  // Adresses sauvegardées (JSON compact, séparées par \u0001)
+  // Format de chaque entrée : "label|address|isDefault"
+  static const _kSavedAddresses = 'saved_addresses';
+
+  static Future<List<String>> getSavedAddresses() async {
+    final raw = await _storage.read(key: _kSavedAddresses);
+    if (raw == null || raw.isEmpty) return [];
+    return raw.split('\u0001').where((s) => s.isNotEmpty).toList();
+  }
+
+  static Future<void> addSavedAddress(String label, String address) async {
+    final list = await getSavedAddresses();
+    list.add('$label|$address|0');
+    await _storage.write(key: _kSavedAddresses, value: list.join('\u0001'));
+  }
+
+  static Future<void> removeSavedAddress(int index) async {
+    final list = await getSavedAddresses();
+    if (index < 0 || index >= list.length) return;
+    list.removeAt(index);
+    await _storage.write(key: _kSavedAddresses, value: list.join('\u0001'));
+  }
+
+  static Future<void> setDefaultSavedAddress(int index) async {
+    final list = await getSavedAddresses();
+    if (index < 0 || index >= list.length) return;
+    final updated = <String>[];
+    for (var i = 0; i < list.length; i++) {
+      final parts = list[i].split('|');
+      if (parts.length < 2) continue;
+      final label = parts[0];
+      final address = parts[1];
+      updated.add('$label|$address|${i == index ? '1' : '0'}');
+    }
+    await _storage.write(key: _kSavedAddresses, value: updated.join('\u0001'));
+  }
+
   // Efface tout (déconnexion)
   static Future<void> clearAll() async {
     await _storage.deleteAll();

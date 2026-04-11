@@ -17,6 +17,7 @@ import 'features/restaurant/screens/restaurant_detail_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
 import 'features/orders/screens/order_history_screen.dart';
 import 'features/orders/screens/order_tracking_screen.dart';
+import 'features/profile/screens/addresses_screen.dart';
 import 'features/profile/screens/payment_methods_screen.dart';
 import 'features/profile/screens/support_screen.dart';
 import 'features/payment/data/checkout_data.dart';
@@ -144,6 +145,10 @@ class App extends StatelessWidget {
       GoRoute(
         path: '/profile/payments',
         builder: (c, s) => const PaymentMethodsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/addresses',
+        builder: (c, s) => const AddressesScreen(),
       ),
       GoRoute(
         path: '/profile/support',

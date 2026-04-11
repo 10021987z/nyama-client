@@ -129,22 +129,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       _paymentOption(
                         'mtn_momo',
                         'MTN Mobile Money',
-                        const Color(0xFFFFCC00),
-                        Icons.account_balance_wallet_rounded,
+                        'assets/images/mock/mtn-mobile-money-logo.jpg',
                       ),
                       const SizedBox(height: 10),
                       _paymentOption(
                         'orange_money',
                         'Orange Money',
-                        AppColors.primary,
-                        Icons.account_balance_wallet_rounded,
+                        'assets/images/mock/orange-money-logo.png',
                       ),
                       const SizedBox(height: 10),
                       _paymentOption(
                         'falla_momo',
                         'Falla Mobile Money',
-                        AppColors.forestGreen,
-                        Icons.account_balance_wallet_rounded,
+                        'assets/images/mock/Fala-Money-logo-.png',
                       ),
                       const SizedBox(height: 20),
 
@@ -482,7 +479,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   // ── Payment option ──
 
   Widget _paymentOption(
-      String value, String title, Color iconColor, IconData icon) {
+      String value, String title, String logoAsset) {
     final selected = _method == value;
     return GestureDetector(
       onTap: () => setState(() => _method = value),
@@ -498,14 +495,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+            ClipOval(
+              child: Image.asset(
+                logoAsset,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfaceLow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
               ),
-              child: Icon(icon, color: iconColor, size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(

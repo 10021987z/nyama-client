@@ -102,13 +102,13 @@ class NyamaDrawer extends ConsumerWidget {
                 children: [
                   _DrawerItem(
                     icon: Icons.receipt_long,
-                    label: 'Commandes',
+                    label: 'Mes commandes',
                     onTap: () => _navigate(context, '/orders/history'),
                   ),
                   _DrawerItem(
                     icon: Icons.location_on_outlined,
-                    label: 'Adresses',
-                    onTap: () => _navigate(context, '/profile'),
+                    label: 'Mes adresses',
+                    onTap: () => _navigate(context, '/profile/addresses'),
                   ),
                   _DrawerItem(
                     icon: Icons.account_balance_wallet_outlined,

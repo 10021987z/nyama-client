@@ -30,19 +30,18 @@ const _trendingDishes = [
 // ─── Category model ─────────────────────────────────────────────────────────
 class _CategoryItem {
   final String label;
-  final String emoji;
-  final Color color;
+  final String image;
   final String searchTerm;
-  const _CategoryItem(this.label, this.emoji, this.color, this.searchTerm);
+  const _CategoryItem(this.label, this.image, this.searchTerm);
 }
 
 const _categories = [
-  _CategoryItem('Plats traditionnels', '\u{1F372}', Color(0xFF8B4513), 'traditionnel'),
-  _CategoryItem('Grillades', '\u{1F356}', Color(0xFFBF360C), 'Grillades'),
-  _CategoryItem('Poissons', '\u{1F41F}', Color(0xFF0277BD), 'Poisson'),
-  _CategoryItem('Boissons', '\u{1F379}', Color(0xFF6A1B9A), 'Boisson'),
-  _CategoryItem('Desserts', '\u{1F370}', Color(0xFFE91E63), 'Desserts'),
-  _CategoryItem('Fast-food', '\u{1F354}', Color(0xFFE65100), 'Rapide'),
+  _CategoryItem('Plats traditionnels', 'assets/images/mock/ndole.jpg', 'traditionnel'),
+  _CategoryItem('Grillades', 'assets/images/mock/grillades-jardin-d-olympe.jpg', 'Grillades'),
+  _CategoryItem('Poissons', 'assets/images/mock/poisson.jpg', 'Poisson'),
+  _CategoryItem('Boissons', 'assets/images/mock/Boissons.jpg', 'Boisson'),
+  _CategoryItem('Desserts', 'assets/images/mock/dessert.jpg', 'Desserts'),
+  _CategoryItem('Fast-food', 'assets/images/mock/fast-food.jpg', 'Rapide'),
 ];
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -476,66 +475,70 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           ),
           const SizedBox(height: 12),
           GridView.count(
-            crossAxisCount: 3,
+            crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.0,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: (MediaQuery.of(context).size.width / 2 - 22) / 120,
             children: _categories.map((cat) {
               return GestureDetector(
                 onTap: () {
                   _controller.text = cat.searchTerm;
                   _onChanged(cat.searchTerm);
                 },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cat.color,
+                child: SizedBox(
+                  height: 120,
+                  child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.white.withValues(alpha: 0.15),
-                                Colors.black.withValues(alpha: 0.2),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          cat.image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceLow),
+                        ),
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.0),
+                                  Colors.black.withValues(alpha: 0.6),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 12,
+                          child: Text(
+                            cat.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Montserrat',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black38,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                ),
                               ],
                             ),
                           ),
                         ),
-                      ),
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(cat.emoji, style: const TextStyle(fontSize: 28)),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Text(
-                                cat.label,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: 'NunitoSans',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  height: 1.2,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -588,17 +591,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _RegionCard(label: 'Douala', emoji: '\u{1F30A}', color: AppColors.primary, onTap: () => _search('Douala'))),
+              Expanded(child: _RegionCard(label: 'Douala', image: 'assets/images/mock/douala.jpg', onTap: () => _search('Douala'))),
               const SizedBox(width: 10),
-              Expanded(child: _RegionCard(label: 'Yaounde', emoji: '\u{1F3D4}', color: AppColors.forestGreen, onTap: () => _search('Yaounde'))),
+              Expanded(child: _RegionCard(label: 'Yaounde', image: 'assets/images/mock/Yaoundé.jpeg', onTap: () => _search('Yaounde'))),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _RegionCard(label: 'Bafoussam', emoji: '\u{26F0}', color: const Color(0xFF5D4037), onTap: () => _search('Bafoussam'))),
+              Expanded(child: _RegionCard(label: 'Bafoussam', image: 'assets/images/mock/eru-specialite-camerounaise.jpg', onTap: () => _search('Bafoussam'))),
               const SizedBox(width: 10),
-              Expanded(child: _RegionCard(label: 'Limbe', emoji: '\u{1F334}', color: const Color(0xFF00695C), onTap: () => _search('Limbe'))),
+              Expanded(child: _RegionCard(label: 'Limbe', image: 'assets/images/mock/limbe-2-2.jpg', onTap: () => _search('Limbe'))),
             ],
           ),
 
@@ -740,58 +743,49 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 // ─── Region Card ────────────────────────────────────────────────────────────
 class _RegionCard extends StatelessWidget {
   final String label;
-  final String emoji;
-  final Color color;
+  final String image;
   final VoidCallback? onTap;
 
-  const _RegionCard({required this.label, required this.emoji, required this.color, this.onTap});
+  const _RegionCard({required this.label, required this.image, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: color,
+      child: SizedBox(
+        height: 100,
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white.withValues(alpha: 0.12), Colors.transparent],
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                image,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceLow),
+              ),
+              Container(color: Colors.black.withValues(alpha: 0.4)),
+              Center(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 6,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  Text(emoji, style: const TextStyle(fontSize: 24)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white.withValues(alpha: 0.5)),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

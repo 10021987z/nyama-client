@@ -54,6 +54,17 @@ enum PaymentProvider {
     }
   }
 
+  String get logoAsset {
+    switch (this) {
+      case PaymentProvider.mtnMomo:
+        return 'assets/images/mock/mtn-mobile-money-logo.jpg';
+      case PaymentProvider.orangeMoney:
+        return 'assets/images/mock/orange-money-logo.png';
+      case PaymentProvider.falla:
+        return 'assets/images/mock/Fala-Money-logo-.png';
+    }
+  }
+
   static PaymentProvider? fromCode(String code) {
     switch (code) {
       case 'mtn_momo':
@@ -305,14 +316,22 @@ class _MethodCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: provider.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+              ClipOval(
+                child: Image.asset(
+                  provider.logoAsset,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: provider.color.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(provider.icon, color: provider.color, size: 20),
+                  ),
                 ),
-                child: Icon(provider.icon, color: provider.color, size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -488,10 +507,17 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(p.icon,
-                            size: 16,
-                            color:
-                                active ? Colors.white : p.color),
+                        ClipOval(
+                          child: Image.asset(
+                            p.logoAsset,
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(p.icon,
+                                size: 16,
+                                color: active ? Colors.white : p.color),
+                          ),
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           p.label,

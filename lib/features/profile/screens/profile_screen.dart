@@ -857,20 +857,17 @@ class ProfileScreen extends ConsumerWidget {
                 SizedBox(height: 16),
                 _PaymentMethodTile(
                   label: 'MTN Mobile Money',
-                  color: Color(0xFFFFCC00),
-                  icon: Icons.account_balance_wallet_rounded,
+                  logoAsset: 'assets/images/mock/mtn-mobile-money-logo.jpg',
                 ),
                 SizedBox(height: 10),
                 _PaymentMethodTile(
                   label: 'Orange Money',
-                  color: Color(0xFFF57C20),
-                  icon: Icons.account_balance_wallet_rounded,
+                  logoAsset: 'assets/images/mock/orange-money-logo.png',
                 ),
                 SizedBox(height: 10),
                 _PaymentMethodTile(
                   label: 'Falla Mobile Money',
-                  color: Color(0xFF1B4332),
-                  icon: Icons.account_balance_wallet_rounded,
+                  logoAsset: 'assets/images/mock/Fala-Money-logo-.png',
                 ),
               ],
             ),
@@ -949,12 +946,10 @@ class ProfileScreen extends ConsumerWidget {
 // ─── Payment method tile (sheet) ────────────────────────────────────────────
 class _PaymentMethodTile extends StatelessWidget {
   final String label;
-  final Color color;
-  final IconData icon;
+  final String logoAsset;
   const _PaymentMethodTile({
     required this.label,
-    required this.color,
-    required this.icon,
+    required this.logoAsset,
   });
 
   @override
@@ -967,14 +962,20 @@ class _PaymentMethodTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(10),
+          ClipOval(
+            child: Image.asset(
+              logoAsset,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 40,
+                height: 40,
+                color: AppColors.surfaceWhite,
+                child: const Icon(Icons.account_balance_wallet_rounded,
+                    color: AppColors.primary, size: 22),
+              ),
             ),
-            child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
