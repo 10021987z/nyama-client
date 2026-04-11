@@ -22,6 +22,7 @@ import 'features/profile/screens/payment_methods_screen.dart';
 import 'features/profile/screens/support_screen.dart';
 import 'features/payment/data/checkout_data.dart';
 import 'features/payment/screens/payment_screen.dart';
+import 'features/payment/screens/payment_success_screen.dart';
 import 'features/rating/screens/rating_screen.dart';
 import 'features/rider_signup/screens/rider_signup_screen.dart';
 import 'features/search/screens/map_view_screen.dart';
@@ -129,6 +130,17 @@ class App extends StatelessWidget {
         builder: (c, s) {
           final data = s.extra is CheckoutData ? s.extra as CheckoutData : null;
           return PaymentScreen(checkout: data);
+        },
+      ),
+      GoRoute(
+        path: '/payment/success',
+        builder: (c, s) {
+          final extra = s.extra as Map<String, dynamic>? ?? const {};
+          return PaymentSuccessScreen(
+            orderId: extra['orderId'] as String? ?? '',
+            amountXaf: (extra['amountXaf'] as num?)?.toInt() ?? 0,
+            reference: extra['reference'] as String? ?? '',
+          );
         },
       ),
       GoRoute(

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nyama_client/features/cart/providers/cart_provider.dart';
 import 'package:nyama_client/features/payment/data/checkout_data.dart';
-import 'package:nyama_client/features/payment/data/payments_repository.dart';
 import 'package:nyama_client/features/payment/screens/payment_screen.dart';
 
 CheckoutData _checkout() => CheckoutData(
@@ -26,25 +25,6 @@ CheckoutData _checkout() => CheckoutData(
     );
 
 void main() {
-  group('PaymentsRepository (simulé)', () {
-    test('initiatePayment renvoie un succès après ~2s', () async {
-      final repo = PaymentsRepository();
-      final sw = Stopwatch()..start();
-      final result = await repo.initiatePayment(
-        orderId: 'ord_1',
-        amount: 5500,
-        currency: 'XAF',
-        phone: '+237600000000',
-        method: 'mtn_momo',
-      );
-      sw.stop();
-      expect(result.success, isTrue);
-      expect(result.status, 'paid');
-      expect(result.transactionId, startsWith('SIMU-'));
-      expect(sw.elapsed.inMilliseconds, greaterThanOrEqualTo(1900));
-    });
-  });
-
   testWidgets('PaymentScreen affiche adresse, méthodes et CTA Payer',
       (tester) async {
     await tester.pumpWidget(

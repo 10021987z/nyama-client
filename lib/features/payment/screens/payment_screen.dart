@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/l10n/translations.dart';
+import '../../../core/network/api_exceptions.dart';
 import '../../../core/services/biometric_service.dart';
+import '../../../core/services/payment_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -11,7 +14,6 @@ import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../orders/data/orders_repository.dart';
 import '../data/checkout_data.dart';
-import '../data/payments_repository.dart';
 
 /// Écran 1.6 — Paiement style Uber Eats.
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -22,16 +24,24 @@ class PaymentScreen extends ConsumerStatefulWidget {
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends ConsumerState<PaymentScreen> {
+class _PaymentScreenState extends ConsumerState<PaymentScreen>
+    with WidgetsBindingObserver {
   String _method = 'mtn_momo';
   late final TextEditingController _phoneCtrl;
   bool _processing = false;
   String _address = '';
   String _quartier = '';
 
+  // ── État de paiement en cours ────────────────────────────────────
+  String? _pendingReference;
+  String? _pendingOrderId;
+  int? _pendingAmount;
+  bool _verifying = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final userPhone = ref.read(authStateProvider).user?.phone;
     _phoneCtrl = TextEditingController(
       text: (userPhone != null && userPhone.isNotEmpty)
@@ -39,6 +49,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           : '+237 6XX XXX XXX',
     );
     _loadAddress();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Quand l'utilisateur revient du navigateur NotchPay, on vérifie.
+    if (state == AppLifecycleState.resumed &&
+        _pendingReference != null &&
+        !_verifying) {
+      _verifyPendingPayment();
+    }
   }
 
   Future<void> _loadAddress() async {
@@ -54,6 +74,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _phoneCtrl.dispose();
     super.dispose();
   }
@@ -85,7 +106,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ),
       body: checkout == null
           ? _buildMissing()
-          : Column(
+          : Stack(
+              children: [
+                _buildBody(checkout),
+                if (_processing || _verifying) _buildLoadingOverlay(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildBody(CheckoutData checkout) {
+    return Column(
               children: [
                 Expanded(
                   child: ListView(
@@ -255,7 +286,46 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                 ),
               ],
+            );
+  }
+
+  Widget _buildLoadingOverlay() {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black54,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceWhite,
+              borderRadius: BorderRadius.circular(18),
             ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: CircularProgressIndicator(
+                    color: AppColors.forestGreen,
+                    strokeWidth: 3,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Paiement en cours...',
+                  style: TextStyle(
+                    fontFamily: AppTheme.bodyFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.charcoal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -568,7 +638,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
 
     final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
 
     // Biométrie
     final biometricEnabled = await SecureStorage.getBiometricEnabled();
@@ -592,6 +661,70 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() => _processing = true);
 
     try {
+      // ── 1. Création de la commande (fallback orderId temporaire si 404)
+      final orderId = await _createOrderOrFallback(checkout);
+
+      // ── 2. Initiation NotchPay
+      final notchPayMethod = PaymentService.normalizeMethod(_method);
+      final init = await PaymentService.initiatePayment(
+        orderId: orderId,
+        amount: checkout.totalXaf,
+        phone: _phoneCtrl.text.trim(),
+        method: notchPayMethod,
+      );
+
+      final reference = init['reference'] as String?;
+      final raw = init['raw'];
+      final authorizationUrl = raw is Map
+          ? raw['authorization_url'] as String?
+          : null;
+
+      if (reference == null ||
+          authorizationUrl == null ||
+          authorizationUrl.isEmpty) {
+        throw const FormatException(
+          'Réponse NotchPay invalide (référence ou URL manquante)',
+        );
+      }
+
+      // Mémorise l'état pour la vérification au retour du navigateur.
+      _pendingReference = reference;
+      _pendingOrderId = orderId;
+      _pendingAmount = checkout.totalXaf;
+
+      // ── 3. Ouverture du navigateur externe
+      final uri = Uri.parse(authorizationUrl);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('Impossible d\'ouvrir la page de paiement');
+      }
+      // À partir d'ici, le relais est pris par didChangeAppLifecycleState
+      // qui déclenchera _verifyPendingPayment() au retour dans l'app.
+    } catch (e) {
+      if (!mounted) return;
+      _pendingReference = null;
+      _pendingOrderId = null;
+      _pendingAmount = null;
+      setState(() => _processing = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.errorRed,
+          content: Text(
+            'Échec du paiement. Vérifiez votre solde et réessayez.',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// POST /orders avec fallback : si l'endpoint renvoie 404, on génère
+  /// un orderId temporaire local. Toutes les autres erreurs remontent.
+  Future<String> _createOrderOrFallback(CheckoutData checkout) async {
+    try {
       final order = await OrdersRepository().createOrder(
         CreateOrderRequest(
           cookId: checkout.cookId,
@@ -604,31 +737,78 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           paymentPhone: _phoneCtrl.text.trim(),
         ),
       );
+      return order.id;
+    } on NotFoundException {
+      return 'order-${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
 
-      final result = await PaymentsRepository().initiatePayment(
-        orderId: order.id,
-        amount: checkout.totalXaf,
-        currency: 'XAF',
-        phone: _phoneCtrl.text.trim(),
-        method: _method,
-      );
+  /// Au retour dans l'app, vérifie le statut du paiement auprès du backend.
+  Future<void> _verifyPendingPayment() async {
+    final reference = _pendingReference;
+    final orderId = _pendingOrderId;
+    final amount = _pendingAmount;
+    if (reference == null || orderId == null || amount == null) return;
+
+    setState(() => _verifying = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+
+    try {
+      final result = await PaymentService.verifyPayment(reference);
+      final status = (result['status'] as String?)?.toLowerCase() ?? '';
 
       if (!mounted) return;
 
-      if (!result.success) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(result.message ?? t('payment_cancelled', ref))),
+      if (status == 'complete' || status == 'paid' || status == 'success') {
+        _pendingReference = null;
+        _pendingOrderId = null;
+        _pendingAmount = null;
+        ref.read(cartProvider.notifier).clearCart();
+        router.go(
+          '/payment/success',
+          extra: {
+            'orderId': orderId,
+            'amountXaf': amount,
+            'reference': reference,
+          },
         );
-        setState(() => _processing = false);
         return;
       }
 
-      ref.read(cartProvider.notifier).clearCart();
-      router.go('/tracking/${order.id}');
-    } catch (e) {
+      if (status == 'pending') {
+        setState(() {
+          _verifying = false;
+          _processing = false;
+        });
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Paiement en attente de confirmation...'),
+          ),
+        );
+        return;
+      }
+
+      // failed ou autre
+      throw Exception('Paiement refusé');
+    } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
-      setState(() => _processing = false);
+      _pendingReference = null;
+      _pendingOrderId = null;
+      _pendingAmount = null;
+      setState(() {
+        _verifying = false;
+        _processing = false;
+      });
+      messenger.showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.errorRed,
+          content: Text(
+            'Échec du paiement. Vérifiez votre solde et réessayez.',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
     }
   }
 
