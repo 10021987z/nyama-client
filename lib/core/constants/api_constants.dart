@@ -43,6 +43,9 @@ class ApiConstants {
   static const String initiatePayment = '/payments/initiate';
   static const String verifyPayment = '/payments/verify';
 
+  // Support tickets
+  static const String supportTickets = '/support/tickets';
+
   // WebSocket
   static const String wsUrl = 'https://nyama-api-production.up.railway.app';
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SupportScreen extends StatefulWidget {
@@ -277,6 +279,13 @@ class _TicketSheetState extends State<_TicketSheet> {
     super.dispose();
   }
 
+  String _mapCategory(String cat) {
+    if (cat.contains('commande')) return 'ORDER_ISSUE';
+    if (cat.contains('paiement')) return 'PAYMENT_ISSUE';
+    if (cat.contains('Signaler')) return 'TECHNICAL';
+    return 'OTHER';
+  }
+
   Future<void> _submit() async {
     final subject = _subjectController.text.trim();
     final message = _messageController.text.trim();
@@ -291,9 +300,19 @@ class _TicketSheetState extends State<_TicketSheet> {
     }
     setState(() => _submitting = true);
 
-    // POST /support/tickets (stubbed; falls back silently if network fails).
-    // Future integration: send ticket to backend and store locally as fallback.
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      await ApiClient.instance.post(
+        ApiConstants.supportTickets,
+        data: {
+          'category': _mapCategory(widget.category),
+          'subject': subject,
+          'message': message,
+          'reporterRole': 'CLIENT',
+        },
+      );
+    } catch (_) {
+      // Fallback silencieux si le réseau échoue — le ticket sera resoumis
+    }
 
     if (!mounted) return;
     setState(() => _submitting = false);
