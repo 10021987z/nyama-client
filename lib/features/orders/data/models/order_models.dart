@@ -139,18 +139,25 @@ enum OrderStatus {
   confirmed,
   preparing,
   ready,
+  assigned,
+  pickedUp,
   delivering,
   delivered,
   cancelled;
 
   static OrderStatus fromString(String? s) {
-    switch (s) {
+    switch (s?.toLowerCase()) {
       case 'confirmed':
         return OrderStatus.confirmed;
       case 'preparing':
         return OrderStatus.preparing;
       case 'ready':
         return OrderStatus.ready;
+      case 'assigned':
+        return OrderStatus.assigned;
+      case 'picked_up':
+      case 'pickedup':
+        return OrderStatus.pickedUp;
       case 'delivering':
         return OrderStatus.delivering;
       case 'delivered':
@@ -172,6 +179,10 @@ enum OrderStatus {
         return 'En préparation';
       case OrderStatus.ready:
         return 'Prête';
+      case OrderStatus.assigned:
+        return 'Livreur assigné';
+      case OrderStatus.pickedUp:
+        return 'Récupérée';
       case OrderStatus.delivering:
         return 'En livraison';
       case OrderStatus.delivered:

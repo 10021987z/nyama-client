@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +26,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     with SingleTickerProviderStateMixin {
   GoogleMapController? _mapController;
   OrderStatus? _liveStatus;
+  Timer? _pollTimer;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   late AnimationController _pulseController;
@@ -42,6 +44,9 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) ref.invalidate(orderDetailProvider(widget.orderId));
+    });
   }
 
   void _setupSocket() {
@@ -99,6 +104,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     final socket = ref.read(socketServiceProvider);
     socket.off('tracking:update');
     socket.off('order:status');
+    _pollTimer?.cancel();
     _mapController?.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -389,7 +395,9 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
         progress = 0;
       case OrderStatus.preparing:
       case OrderStatus.ready:
+      case OrderStatus.assigned:
         progress = 1;
+      case OrderStatus.pickedUp:
       case OrderStatus.delivering:
         progress = 2;
       case OrderStatus.delivered:

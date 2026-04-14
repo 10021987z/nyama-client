@@ -26,18 +26,34 @@ class CreateOrderRequest {
   });
 
   Map<String, dynamic> toJson() {
+    // Defaults Douala centre when GPS missing — backend requires lat/lng.
     final body = <String, dynamic>{
       'cookId': cookId,
       'items': items,
       'deliveryAddress': deliveryAddress,
-      'paymentMethod': paymentMethod,
+      'deliveryLat': lat ?? 4.0511,
+      'deliveryLng': lng ?? 9.7679,
+      'paymentMethod': _normalizeMethod(paymentMethod),
     };
-    if (repere != null) body['repere'] = repere;
-    if (noteForCook != null) body['noteForCook'] = noteForCook;
-    if (paymentPhone != null) body['paymentPhone'] = paymentPhone;
-    if (lat != null) body['lat'] = lat;
-    if (lng != null) body['lng'] = lng;
+    if (repere != null) body['landmark'] = repere;
+    if (noteForCook != null) body['clientNote'] = noteForCook;
     return body;
+  }
+
+  static String _normalizeMethod(String method) {
+    switch (method.toLowerCase()) {
+      case 'mtn_momo':
+      case 'mtn':
+      case 'falla_momo':
+        return 'MTN_MOMO';
+      case 'orange_money':
+      case 'om':
+        return 'ORANGE_MONEY';
+      case 'cash':
+        return 'CASH';
+      default:
+        return method.toUpperCase();
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/fcfa_formatter.dart';
@@ -43,6 +44,7 @@ class _ProductSheet extends StatefulWidget {
 
 class _ProductSheetState extends State<_ProductSheet> {
   int _quantity = 1;
+  bool _descExpanded = false;
   final _notesController = TextEditingController();
 
   @override
@@ -88,12 +90,12 @@ class _ProductSheetState extends State<_ProductSheet> {
                   controller: scrollController,
                   padding: EdgeInsets.only(bottom: bottom + 100),
                   children: [
-                    // Image
+                    // Image 220px
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(24)),
                       child: SizedBox(
-                        height: 200,
+                        height: 220,
                         width: double.infinity,
                         child: item.imageUrl != null
                             ? CachedNetworkImage(
@@ -112,43 +114,54 @@ class _ProductSheetState extends State<_ProductSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Name
+                          // Name 26px bold
                           Text(
                             item.name,
                             style: const TextStyle(
                               fontFamily: AppTheme.headlineFamily,
-                              fontSize: 24,
+                              fontSize: 26,
                               fontWeight: FontWeight.w800,
                               color: AppColors.charcoal,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          // Description
+
+                          // Description with "Voir plus" (max 4 lines)
                           if (item.description != null)
-                            Text(
-                              item.description!,
-                              style: const TextStyle(
-                                fontFamily: AppTheme.bodyFamily,
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                                height: 1.5,
-                              ),
+                            _ExpandableDescription(
+                              text: item.description!,
+                              isExpanded: _descExpanded,
+                              onToggle: () => setState(
+                                  () => _descExpanded = !_descExpanded),
                             ),
                           const SizedBox(height: 16),
-                          // Price
-                          Text(
-                            item.priceXaf.toFcfa(),
-                            style: const TextStyle(
-                              fontFamily: AppTheme.monoFamily,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Info row: timer + cook
-                          Row(
+
+                          // Info row: badge catégorie + timer + rating
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
+                              // Category badge
+                              if (item.category != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    item.category!,
+                                    style: const TextStyle(
+                                      fontFamily: AppTheme.bodyFamily,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              // Timer
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 6),
@@ -175,38 +188,89 @@ class _ProductSheetState extends State<_ProductSheet> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.forestGreen
-                                      .withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.person,
-                                        size: 14,
-                                        color: AppColors.forestGreen),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Par ${widget.cook.displayName}',
-                                      style: const TextStyle(
-                                        fontFamily: AppTheme.bodyFamily,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.forestGreen,
+                              // Rating
+                              if (widget.cook.avgRating > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF8E0),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.star,
+                                          size: 14, color: AppColors.gold),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        widget.cook.avgRating
+                                            .toStringAsFixed(1),
+                                        style: const TextStyle(
+                                          fontFamily: AppTheme.bodyFamily,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.gold,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 16),
+
+                          // Cook name with avatar — tappable
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              context.push('/restaurant/${widget.cook.id}');
+                            },
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: AppColors.forestGreen
+                                      .withValues(alpha: 0.1),
+                                  child: const Icon(Icons.person,
+                                      size: 14,
+                                      color: AppColors.forestGreen),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Par ${widget.cook.displayName}',
+                                  style: const TextStyle(
+                                    fontFamily: AppTheme.bodyFamily,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.forestGreen,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right,
+                                    size: 16,
+                                    color: AppColors.forestGreen),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Price 28px
+                          Text(
+                            item.priceXaf.toFcfa(),
+                            style: const TextStyle(
+                              fontFamily: AppTheme.monoFamily,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+                          const Divider(height: 1, color: AppColors.surfaceLow),
+                          const SizedBox(height: 20),
 
                           // Quantity selector
                           Row(
@@ -224,6 +288,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                               _QuantityButton(
                                 icon: Icons.remove,
                                 enabled: _quantity > 1,
+                                isDecrease: true,
                                 onTap: () =>
                                     setState(() => _quantity--),
                               ),
@@ -234,7 +299,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontFamily: AppTheme.monoFamily,
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.charcoal,
                                   ),
@@ -243,6 +308,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                               _QuantityButton(
                                 icon: Icons.add,
                                 enabled: true,
+                                isDecrease: false,
                                 onTap: () =>
                                     setState(() => _quantity++),
                               ),
@@ -264,10 +330,10 @@ class _ProductSheetState extends State<_ProductSheet> {
                           const SizedBox(height: 8),
                           TextField(
                             controller: _notesController,
-                            maxLines: 2,
+                            maxLines: 3,
                             decoration: InputDecoration(
                               hintText:
-                                  'Ex: sans oignon, bien cuit, extra piment...',
+                                  'Ex: Sans piment, bien cuit, double portion de sauce...',
                               hintStyle: const TextStyle(
                                 fontFamily: AppTheme.bodyFamily,
                                 fontSize: 13,
@@ -282,6 +348,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                               contentPadding: const EdgeInsets.all(14),
                             ),
                           ),
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),
@@ -378,18 +445,73 @@ class _ProductSheetState extends State<_ProductSheet> {
       );
 }
 
+// ── Expandable description ──────────────────────────────────────────────────
+
+class _ExpandableDescription extends StatelessWidget {
+  final String text;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+
+  const _ExpandableDescription({
+    required this.text,
+    required this.isExpanded,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          text,
+          maxLines: isExpanded ? null : 4,
+          overflow: isExpanded ? null : TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontFamily: AppTheme.bodyFamily,
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
+        ),
+        if (text.length > 150)
+          GestureDetector(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                isExpanded ? 'Voir moins' : 'Voir plus',
+                style: const TextStyle(
+                  fontFamily: AppTheme.bodyFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Quantity button (circle 40px) ───────────────────────────────────────────
+
 class _QuantityButton extends StatelessWidget {
   final IconData icon;
   final bool enabled;
+  final bool isDecrease;
   final VoidCallback onTap;
   const _QuantityButton({
     required this.icon,
     required this.enabled,
+    required this.isDecrease,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = isDecrease ? AppColors.textTertiary : AppColors.forestGreen;
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
@@ -397,14 +519,16 @@ class _QuantityButton extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           color: enabled
-              ? AppColors.forestGreen.withValues(alpha: 0.1)
+              ? (isDecrease
+                  ? AppColors.surfaceLow
+                  : AppColors.forestGreen.withValues(alpha: 0.1))
               : AppColors.surfaceLow,
-          borderRadius: BorderRadius.circular(12),
+          shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
           size: 20,
-          color: enabled ? AppColors.forestGreen : AppColors.textTertiary,
+          color: enabled ? color : AppColors.textTertiary,
         ),
       ),
     );

@@ -32,6 +32,7 @@ class Cook {
   final Map<String, DayHours> openingHours;
   final QuarterInfo? quarter;
   final List<MenuItem> menuItems;
+  final int? prepTimeAvgMin;
 
   const Cook({
     required this.id,
@@ -46,6 +47,7 @@ class Cook {
     required this.openingHours,
     this.quarter,
     required this.menuItems,
+    this.prepTimeAvgMin,
   });
 
   /// Retourne les horaires du jour actuel (null si non défini)
@@ -93,6 +95,7 @@ class Cook {
               ?.map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      prepTimeAvgMin: (json['prepTimeAvgMin'] as num?)?.toInt(),
     );
   }
 

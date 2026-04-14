@@ -748,6 +748,7 @@ class _RestaurantsRow extends StatelessWidget {
           }
           final c = cooks[i];
           final m = _mockRestaurants[i % _mockRestaurants.length];
+          final prepMin = c.prepTimeAvgMin ?? 25;
           return _RestaurantCard(
             id: c.id,
             name: c.displayName,
@@ -755,9 +756,10 @@ class _RestaurantsRow extends StatelessWidget {
                 ? '${c.quarter!.name}, ${c.quarter!.city}'
                 : (c.landmark ?? 'Douala'),
             rating: c.avgRating,
-            eta: '25-35 min',
+            eta: '$prepMin-${prepMin + 10} min',
             gradient: m.gradient,
             imageAsset: m.image,
+            specialty: c.specialty.isNotEmpty ? c.specialty.first : null,
           );
         },
       ),
@@ -773,6 +775,7 @@ class _RestaurantCard extends StatelessWidget {
   final String eta;
   final List<Color> gradient;
   final String imageAsset;
+  final String? specialty;
   const _RestaurantCard({
     required this.id,
     required this.name,
@@ -781,6 +784,7 @@ class _RestaurantCard extends StatelessWidget {
     required this.eta,
     required this.gradient,
     required this.imageAsset,
+    this.specialty,
   });
 
   @override
@@ -860,6 +864,19 @@ class _RestaurantCard extends StatelessWidget {
                     color: _kInk,
                   ),
                 ),
+                if (specialty != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    specialty!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: _kOrange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [
