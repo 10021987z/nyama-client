@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/l10n/translations.dart';
 import '../../../core/network/api_exceptions.dart';
@@ -14,8 +13,9 @@ import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../orders/data/orders_repository.dart';
 import '../data/checkout_data.dart';
+import 'payment_webview_screen.dart';
 
-/// Écran 1.6 — Paiement style Uber Eats.
+/// Écran 1.6 — Paiement NotchPay (MTN / Orange) + Cash à la livraison.
 class PaymentScreen extends ConsumerStatefulWidget {
   final CheckoutData? checkout;
   const PaymentScreen({super.key, this.checkout});
@@ -24,41 +24,20 @@ class PaymentScreen extends ConsumerStatefulWidget {
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends ConsumerState<PaymentScreen>
-    with WidgetsBindingObserver {
+class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _method = 'mtn_momo';
   late final TextEditingController _phoneCtrl;
   bool _processing = false;
   String _address = '';
-  String _quartier = '';
-
-  // ── État de paiement en cours ────────────────────────────────────
-  String? _pendingReference;
-  String? _pendingOrderId;
-  int? _pendingAmount;
-  bool _verifying = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     final userPhone = ref.read(authStateProvider).user?.phone;
     _phoneCtrl = TextEditingController(
-      text: (userPhone != null && userPhone.isNotEmpty)
-          ? userPhone
-          : '+237 6XX XXX XXX',
+      text: (userPhone != null && userPhone.isNotEmpty) ? userPhone : '',
     );
     _loadAddress();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Quand l'utilisateur revient du navigateur NotchPay, on vérifie.
-    if (state == AppLifecycleState.resumed &&
-        _pendingReference != null &&
-        !_verifying) {
-      _verifyPendingPayment();
-    }
   }
 
   Future<void> _loadAddress() async {
@@ -66,18 +45,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     final quartier = await SecureStorage.getQuartier();
     if (!mounted) return;
     setState(() {
-      _quartier = quartier ?? '';
-      _address = [quartier, city].where((s) => s != null && s.isNotEmpty).join(', ');
+      _address = [quartier, city]
+          .where((s) => s != null && s.isNotEmpty)
+          .join(', ');
       if (_address.isEmpty) _address = 'Bonapriso, Douala';
     });
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _phoneCtrl.dispose();
     super.dispose();
   }
+
+  bool get _isCash => _method == 'cash';
+  bool get _isMomo => _method == 'mtn_momo' || _method == 'orange_money';
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +91,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           : Stack(
               children: [
                 _buildBody(checkout),
-                if (_processing || _verifying) _buildLoadingOverlay(),
+                if (_processing) _buildLoadingOverlay(),
               ],
             ),
     );
@@ -117,219 +99,184 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
   Widget _buildBody(CheckoutData checkout) {
     return Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    children: [
-                      // ── ADRESSE ──────────────────────────────────
-                      _buildAddressCard(),
-                      const SizedBox(height: 20),
-                      _divider(),
-                      const SizedBox(height: 20),
-
-                      // ── RÉCAP COMMANDE ───────────────────────────
-                      Text(
-                        t('your_cart', ref),
-                        style: const TextStyle(
-                          fontFamily: AppTheme.headlineFamily,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.charcoal,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ...checkout.items.map(_buildCartItem),
-                      const SizedBox(height: 16),
-                      _buildSummary(checkout),
-                      const SizedBox(height: 20),
-                      _divider(),
-                      const SizedBox(height: 20),
-
-                      // ── PAIEMENT ─────────────────────────────────
-                      Text(
-                        t('payment_method', ref),
-                        style: const TextStyle(
-                          fontFamily: AppTheme.headlineFamily,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.charcoal,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _paymentOption(
-                        'mtn_momo',
-                        'MTN Mobile Money',
-                        'assets/images/mock/mtn-mobile-money-logo.jpg',
-                      ),
-                      const SizedBox(height: 10),
-                      _paymentOption(
-                        'orange_money',
-                        'Orange Money',
-                        'assets/images/mock/orange-money-logo.png',
-                      ),
-                      const SizedBox(height: 10),
-                      _paymentOption(
-                        'falla_momo',
-                        'Falla Mobile Money',
-                        'assets/images/mock/Fala-Money-logo-.png',
-                      ),
-                      const SizedBox(height: 20),
-
-                      // ── TÉLÉPHONE ────────────────────────────────
-                      Text(
-                        t('phone_number', ref),
-                        style: const TextStyle(
-                          fontFamily: AppTheme.bodyFamily,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceWhite,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                              color: AppColors.outlineVariant, width: 1),
-                        ),
-                        child: TextField(
-                          controller: _phoneCtrl,
-                          keyboardType: TextInputType.phone,
-                          style: const TextStyle(
-                            fontFamily: AppTheme.monoFamily,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.charcoal,
-                          ),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: '+237 6XX XXX XXX',
-                            isDense: true,
-                            contentPadding:
-                                EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        t('sms_confirmation', ref),
-                        style: const TextStyle(
-                          fontFamily: AppTheme.bodyFamily,
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [
+              _buildAddressCard(),
+              const SizedBox(height: 20),
+              _divider(),
+              const SizedBox(height: 20),
+              Text(
+                t('your_cart', ref),
+                style: const TextStyle(
+                  fontFamily: AppTheme.headlineFamily,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.charcoal,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...checkout.items.map(_buildCartItem),
+              const SizedBox(height: 16),
+              _buildSummary(checkout),
+              const SizedBox(height: 20),
+              _divider(),
+              const SizedBox(height: 20),
+              Text(
+                t('payment_method', ref),
+                style: const TextStyle(
+                  fontFamily: AppTheme.headlineFamily,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.charcoal,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _paymentOption(
+                value: 'mtn_momo',
+                title: 'MTN Mobile Money',
+                logoAsset: 'assets/images/mock/mtn-mobile-money-logo.jpg',
+                badge: 'Populaire',
+              ),
+              const SizedBox(height: 10),
+              _paymentOption(
+                value: 'orange_money',
+                title: 'Orange Money',
+                logoAsset: 'assets/images/mock/orange-money-logo.png',
+              ),
+              const SizedBox(height: 10),
+              _paymentOption(
+                value: 'cash',
+                title: 'Cash à la livraison',
+                icon: Icons.payments_rounded,
+              ),
+              if (_isMomo) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Numéro MoMo',
+                  style: const TextStyle(
+                    fontFamily: AppTheme.bodyFamily,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-
-                // ── CTA PAYER ──────────────────────────────────
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  color: AppColors.creme,
-                  child: SafeArea(
-                    top: false,
-                    child: SizedBox(
-                      height: 72,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _processing
-                            ? null
-                            : () => _onPay(checkout),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.forestGreen,
-                          disabledBackgroundColor:
-                              AppColors.forestGreen.withValues(alpha: 0.6),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        child: _processing
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                      Icons.lock_outline_rounded,
-                                      size: 18,
-                                      color: Colors.white),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    '${t('pay', ref)} ${checkout.totalXaf.toFcfa()}',
-                                    style: const TextStyle(
-                                      fontFamily:
-                                          AppTheme.headlineFamily,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceWhite,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: AppColors.outlineVariant, width: 1),
+                  ),
+                  child: TextField(
+                    controller: _phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(
+                      fontFamily: AppTheme.monoFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.charcoal,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: '+237 6XX XXX XXX',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  t('sms_confirmation', ref),
+                  style: const TextStyle(
+                    fontFamily: AppTheme.bodyFamily,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
-            );
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          color: AppColors.creme,
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 56,
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _processing ? null : () => _onPay(checkout),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.forestGreen,
+                  disabledBackgroundColor:
+                      AppColors.forestGreen.withValues(alpha: 0.6),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: _processing
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.lock_outline_rounded,
+                              size: 18, color: Colors.white),
+                          const SizedBox(width: 10),
+                          Text(
+                            _isCash
+                                ? 'Confirmer ${checkout.totalXaf.toFcfa()}'
+                                : '${t('pay', ref)} ${checkout.totalXaf.toFcfa()}',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.headlineFamily,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildLoadingOverlay() {
-    return Positioned.fill(
+    return const Positioned.fill(
       child: ColoredBox(
         color: Colors.black54,
         child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceWhite,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: CircularProgressIndicator(
-                    color: AppColors.forestGreen,
-                    strokeWidth: 3,
-                  ),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Paiement en cours...',
-                  style: TextStyle(
-                    fontFamily: AppTheme.bodyFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.charcoal,
-                  ),
-                ),
-              ],
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: CircularProgressIndicator(
+              color: AppColors.primary,
+              strokeWidth: 3,
             ),
           ),
         ),
       ),
     );
   }
-
-  // ── Address card ──
 
   Widget _buildAddressCard() {
     return Container(
@@ -345,84 +292,64 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.location_on_rounded,
-                    color: AppColors.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _address,
-                      style: const TextStyle(
-                        fontFamily: AppTheme.bodyFamily,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.charcoal,
-                      ),
-                    ),
-                    if (_quartier.isNotEmpty)
-                      Text(
-                        _quartier,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: () => context.push('/onboarding/quartier'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(40, 32),
-                ),
-                child: Text(
-                  t('modify', ref),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.location_on_rounded,
+                color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t('delivery_address', ref),
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.schedule, size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                t('delivery_in', ref),
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
+                const SizedBox(height: 2),
+                Text(
+                  _address,
+                  style: const TextStyle(
+                    fontFamily: AppTheme.bodyFamily,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.charcoal,
+                  ),
                 ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/onboarding/quartier'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(40, 32),
+            ),
+            child: Text(
+              t('modify', ref),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
               ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  // ── Cart item row ──
 
   Widget _buildCartItem(CartItem item) {
     return Padding(
@@ -471,8 +398,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
       ),
     );
   }
-
-  // ── Summary ──
 
   Widget _buildSummary(CheckoutData checkout) {
     return Container(
@@ -546,10 +471,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         ],
       );
 
-  // ── Payment option ──
-
-  Widget _paymentOption(
-      String value, String title, String logoAsset) {
+  Widget _paymentOption({
+    required String value,
+    required String title,
+    String? logoAsset,
+    IconData? icon,
+    String? badge,
+  }) {
     final selected = _method == value;
     return GestureDetector(
       onTap: () => setState(() => _method = value),
@@ -565,37 +493,66 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         ),
         child: Row(
           children: [
-            ClipOval(
-              child: Image.asset(
-                logoAsset,
-                width: 40,
-                height: 40,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+            if (logoAsset != null)
+              ClipOval(
+                child: Image.asset(
+                  logoAsset,
                   width: 40,
                   height: 40,
-                  decoration: const BoxDecoration(
-                    color: AppColors.surfaceLow,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, e, s) => _iconFallback(),
+                ),
+              )
+            else
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.forestGreen.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon ?? Icons.account_balance_wallet_rounded,
+                  color: AppColors.forestGreen,
+                  size: 22,
                 ),
               ),
-            ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: AppTheme.bodyFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.charcoal,
-                ),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.bodyFamily,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.charcoal,
+                      ),
+                    ),
+                  ),
+                  if (badge != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        badge,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.bodyFamily,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Container(
@@ -604,9 +561,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.outlineVariant,
+                  color:
+                      selected ? AppColors.primary : AppColors.outlineVariant,
                   width: 2,
                 ),
                 color: selected ? AppColors.primary : Colors.transparent,
@@ -621,16 +577,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     );
   }
 
+  Widget _iconFallback() => Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceLow,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.account_balance_wallet_rounded,
+          color: AppColors.primary,
+          size: 22,
+        ),
+      );
+
   Widget _divider() => const Divider(
         height: 1,
         color: AppColors.surfaceLow,
         thickness: 1,
       );
 
-  // ── Pay action ──
-
   Future<void> _onPay(CheckoutData checkout) async {
-    if (_phoneCtrl.text.trim().isEmpty) {
+    if (_isMomo && _phoneCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t('enter_number', ref))),
       );
@@ -638,22 +606,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     }
 
     final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
 
-    // Biométrie
-    final biometricEnabled = await SecureStorage.getBiometricEnabled();
-    if (biometricEnabled) {
-      final available =
-          await BiometricService.instance.isBiometricAvailable();
-      if (available) {
-        final ok = await BiometricService.instance.authenticate(
-          reason:
-              '${t('payment', ref)} ${checkout.totalXaf.toFcfa()}',
-        );
-        if (!ok) {
-          messenger.showSnackBar(
-            SnackBar(content: Text(t('payment_cancelled', ref))),
+    if (_isMomo) {
+      final biometricEnabled = await SecureStorage.getBiometricEnabled();
+      if (biometricEnabled) {
+        final available =
+            await BiometricService.instance.isBiometricAvailable();
+        if (available) {
+          final ok = await BiometricService.instance.authenticate(
+            reason: '${t('payment', ref)} ${checkout.totalXaf.toFcfa()}',
           );
-          return;
+          if (!ok) {
+            messenger.showSnackBar(
+              SnackBar(content: Text(t('payment_cancelled', ref))),
+            );
+            return;
+          }
         }
       }
     }
@@ -661,10 +630,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     setState(() => _processing = true);
 
     try {
-      // ── 1. Création de la commande (fallback orderId temporaire si 404)
       final orderId = await _createOrderOrFallback(checkout);
 
-      // ── 2. Initiation NotchPay
+      if (_isCash) {
+        if (!mounted) return;
+        ref.read(cartProvider.notifier).clearCart();
+        setState(() => _processing = false);
+        router.go('/orders/$orderId/track');
+        return;
+      }
+
       final notchPayMethod = PaymentService.normalizeMethod(_method);
       final init = await PaymentService.initiatePayment(
         orderId: orderId,
@@ -675,9 +650,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
 
       final reference = init['reference'] as String?;
       final raw = init['raw'];
-      final authorizationUrl = raw is Map
-          ? raw['authorization_url'] as String?
-          : null;
+      final authorizationUrl =
+          raw is Map ? raw['authorization_url'] as String? : null;
 
       if (reference == null ||
           authorizationUrl == null ||
@@ -687,27 +661,46 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
         );
       }
 
-      // Mémorise l'état pour la vérification au retour du navigateur.
-      _pendingReference = reference;
-      _pendingOrderId = orderId;
-      _pendingAmount = checkout.totalXaf;
-
-      // ── 3. Ouverture du navigateur externe
-      final uri = Uri.parse(authorizationUrl);
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) {
-        throw Exception('Impossible d\'ouvrir la page de paiement');
-      }
-      // À partir d'ici, le relais est pris par didChangeAppLifecycleState
-      // qui déclenchera _verifyPendingPayment() au retour dans l'app.
-    } catch (e) {
       if (!mounted) return;
-      _pendingReference = null;
-      _pendingOrderId = null;
-      _pendingAmount = null;
+      setState(() => _processing = false);
+
+      final result = await Navigator.of(context).push<PaymentResult>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => PaymentWebViewScreen(
+            authorizationUrl: authorizationUrl,
+            reference: reference,
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+
+      switch (result) {
+        case PaymentResult.success:
+          ref.read(cartProvider.notifier).clearCart();
+          router.go('/orders/$orderId/track');
+          break;
+        case PaymentResult.failed:
+          messenger.showSnackBar(
+            const SnackBar(
+              backgroundColor: AppColors.errorRed,
+              content: Text(
+                'Paiement échoué',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          );
+          break;
+        case PaymentResult.cancelled:
+        case null:
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Paiement annulé')),
+          );
+          break;
+      }
+    } catch (_) {
+      if (!mounted) return;
       setState(() => _processing = false);
       messenger.showSnackBar(
         const SnackBar(
@@ -721,94 +714,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen>
     }
   }
 
-  /// POST /orders avec fallback : si l'endpoint renvoie 404, on génère
-  /// un orderId temporaire local. Toutes les autres erreurs remontent.
   Future<String> _createOrderOrFallback(CheckoutData checkout) async {
     try {
       final order = await OrdersRepository().createOrder(
         CreateOrderRequest(
           cookId: checkout.cookId,
           items: checkout.items
-              .map((i) =>
-                  {'menuItemId': i.menuItemId, 'quantity': i.quantity})
+              .map((i) => {
+                    'menuItemId': i.menuItemId,
+                    'quantity': i.quantity,
+                  })
               .toList(),
           deliveryAddress: _address,
           paymentMethod: _method,
-          paymentPhone: _phoneCtrl.text.trim(),
+          paymentPhone: _isMomo ? _phoneCtrl.text.trim() : null,
         ),
       );
       return order.id;
     } on NotFoundException {
       return 'order-${DateTime.now().millisecondsSinceEpoch}';
-    }
-  }
-
-  /// Au retour dans l'app, vérifie le statut du paiement auprès du backend.
-  Future<void> _verifyPendingPayment() async {
-    final reference = _pendingReference;
-    final orderId = _pendingOrderId;
-    final amount = _pendingAmount;
-    if (reference == null || orderId == null || amount == null) return;
-
-    setState(() => _verifying = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
-
-    try {
-      final result = await PaymentService.verifyPayment(reference);
-      final status = (result['status'] as String?)?.toLowerCase() ?? '';
-
-      if (!mounted) return;
-
-      if (status == 'complete' || status == 'paid' || status == 'success') {
-        _pendingReference = null;
-        _pendingOrderId = null;
-        _pendingAmount = null;
-        ref.read(cartProvider.notifier).clearCart();
-        router.go(
-          '/payment/success',
-          extra: {
-            'orderId': orderId,
-            'amountXaf': amount,
-            'reference': reference,
-          },
-        );
-        return;
-      }
-
-      if (status == 'pending') {
-        setState(() {
-          _verifying = false;
-          _processing = false;
-        });
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Paiement en attente de confirmation...'),
-          ),
-        );
-        return;
-      }
-
-      // failed ou autre
-      throw Exception('Paiement refusé');
-    } catch (_) {
-      if (!mounted) return;
-      _pendingReference = null;
-      _pendingOrderId = null;
-      _pendingAmount = null;
-      setState(() {
-        _verifying = false;
-        _processing = false;
-      });
-      messenger.showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.errorRed,
-          content: Text(
-            'Échec du paiement. Vérifiez votre solde et réessayez.',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      );
     }
   }
 

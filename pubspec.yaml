@@ -55,6 +55,9 @@ dependencies:
   # Appel téléphonique direct
   url_launcher: ^6.2.0
 
+  # WebView pour paiement NotchPay
+  webview_flutter: ^4.7.0
+
   # Partage natif (parrainage)
   share_plus: ^10.0.0
 
