@@ -12,11 +12,13 @@ enum PaymentResult { success, failed, cancelled }
 class PaymentWebViewScreen extends StatefulWidget {
   final String authorizationUrl;
   final String reference;
+  final String? paymentId;
 
   const PaymentWebViewScreen({
     super.key,
     required this.authorizationUrl,
     required this.reference,
+    this.paymentId,
   });
 
   @override
@@ -34,17 +36,61 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   DateTime? _pollStart;
   bool _finished = false;
   bool _loading = true;
+  bool _isSandbox = false;
+  bool _forcingTest = false;
+
+  bool _detectSandbox(String url) {
+    final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+    return host.contains('test.');
+  }
+
+  Future<void> _forceTestComplete() async {
+    final paymentId = widget.paymentId;
+    if (paymentId == null || _forcingTest || _finished) return;
+    setState(() => _forcingTest = true);
+    try {
+      await PaymentService.testComplete(paymentId);
+      _finish(PaymentResult.success);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _forcingTest = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.errorRed,
+          content: Text(
+            'Forçage test échoué: $e',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _isSandbox = _detectSandbox(widget.authorizationUrl);
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppColors.creme)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => _loading = true),
-          onPageFinished: (_) => setState(() => _loading = false),
+          onPageStarted: (url) {
+            if (mounted) {
+              setState(() {
+                _loading = true;
+                _isSandbox = _isSandbox || _detectSandbox(url);
+              });
+            }
+          },
+          onPageFinished: (url) {
+            if (mounted) {
+              setState(() {
+                _loading = false;
+                _isSandbox = _isSandbox || _detectSandbox(url);
+              });
+            }
+          },
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
             if (uri != null &&
@@ -186,6 +232,41 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
                     minHeight: 2,
                     color: AppColors.primary,
                     backgroundColor: AppColors.surfaceLow,
+                  ),
+                ),
+              if (_isSandbox && widget.paymentId != null)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  child: ElevatedButton.icon(
+                    onPressed: _forcingTest ? null : _forceTestComplete,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _forcingTest
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.bolt_rounded, size: 20),
+                    label: const Text(
+                      'Forcer paiement (test)',
+                      style: TextStyle(
+                        fontFamily: AppTheme.bodyFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
             ],

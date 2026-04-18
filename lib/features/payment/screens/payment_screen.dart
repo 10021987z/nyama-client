@@ -649,9 +649,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       );
 
       final reference = init['reference'] as String?;
+      final paymentId = init['paymentId'] as String?;
       final raw = init['raw'];
-      final authorizationUrl =
-          raw is Map ? raw['authorization_url'] as String? : null;
+      final authorizationUrl = (init['paymentUrl'] as String?) ??
+          (raw is Map ? raw['authorization_url'] as String? : null);
 
       if (reference == null ||
           authorizationUrl == null ||
@@ -670,6 +671,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           builder: (_) => PaymentWebViewScreen(
             authorizationUrl: authorizationUrl,
             reference: reference,
+            paymentId: paymentId,
           ),
         ),
       );

@@ -72,6 +72,28 @@ class PaymentService {
     throw Exception('Erreur de paiement: ${response.body}');
   }
 
+  /// POST /payments/:paymentId/test-complete
+  ///
+  /// Sandbox-only : force le Payment à SUCCESS sans passer par NotchPay.
+  /// L'endpoint backend refuse l'appel en production (403).
+  static Future<Map<String, dynamic>> testComplete(String paymentId) async {
+    final token = await SecureStorage.getAccessToken();
+    final response = await http.post(
+      Uri.parse('$_baseUrl/payments/$paymentId/test-complete'),
+      headers: {
+        'Accept': 'application/json',
+        if (token != null && token.isNotEmpty)
+          'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+    }
+    throw Exception('test-complete échoué: ${response.body}');
+  }
+
   /// GET /payments/verify/:reference
   ///
   /// Retourne le corps JSON décodé. Le champ `status` peut être :
