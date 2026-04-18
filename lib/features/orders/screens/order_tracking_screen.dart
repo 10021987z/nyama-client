@@ -10,6 +10,7 @@ import '../../../core/network/socket_provider.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../data/models/order_models.dart';
 import '../providers/orders_provider.dart';
+import '../widgets/order_progress_timeline.dart';
 
 /// Écran 1.7 — Suivi commande temps réel.
 class OrderTrackingScreen extends ConsumerStatefulWidget {
@@ -22,27 +23,18 @@ class OrderTrackingScreen extends ConsumerStatefulWidget {
       _OrderTrackingScreenState();
 }
 
-class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
-    with SingleTickerProviderStateMixin {
+class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   GoogleMapController? _mapController;
   OrderStatus? _liveStatus;
   Timer? _pollTimer;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
-  late AnimationController _pulseController;
 
-  // Horodatages timeline (en attendant un payload backend riche)
-  final DateTime _receivedAt = DateTime.now().subtract(const Duration(minutes: 17));
-  final DateTime _preparingAt = DateTime.now().subtract(const Duration(minutes: 5));
   final DateTime _eta = DateTime.now().add(const Duration(minutes: 12));
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) ref.invalidate(orderDetailProvider(widget.orderId));
@@ -106,7 +98,6 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     socket.off('order:status');
     _pollTimer?.cancel();
     _mapController?.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -321,54 +312,45 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
 
         const SizedBox(height: 24),
 
-        // ── Timeline ────────────────────────────────────────────────
+        // ── Header statut (dynamique) + ETA ─────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Statut de la livraison',
-                style: TextStyle(
+              Text(
+                _headlineFor(currentStatus),
+                style: const TextStyle(
                   fontFamily: 'Montserrat',
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: AppColors.charcoal,
+                  height: 1.25,
                 ),
               ),
-              const SizedBox(height: 16),
-              _TimelineStep(
-                label: 'Commande reçue',
-                time: _hm(_receivedAt),
-                description: 'Nous avons bien reçu votre commande',
-                status: _stepStatus(currentStatus, 0),
-                isFirst: true,
-                pulseController: _pulseController,
-              ),
-              _TimelineStep(
-                label: 'En préparation',
-                time: _hm(_preparingAt),
-                description:
-                    'Le chef prépare votre ${order.items.isNotEmpty ? order.items.first.name : "commande"}',
-                status: _stepStatus(currentStatus, 1),
-                pulseController: _pulseController,
-              ),
-              _TimelineStep(
-                label: 'En route',
-                time: '',
-                description: 'Kevin a récupéré votre commande',
-                status: _stepStatus(currentStatus, 2),
-                pulseController: _pulseController,
-              ),
-              _TimelineStep(
-                label: 'Livrée',
-                time: '',
-                description: 'Prévu vers ${_hm(_eta)}',
-                status: _stepStatus(currentStatus, 3),
-                isLast: true,
-                pulseController: _pulseController,
-              ),
+              const SizedBox(height: 6),
+              if (currentStatus != OrderStatus.delivered &&
+                  currentStatus != OrderStatus.cancelled)
+                Text(
+                  'Livraison estimée : ${_hm(_eta)}',
+                  style: const TextStyle(
+                    fontFamily: 'SpaceMono',
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
             ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Timeline 7 étapes ───────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: OrderProgressTimeline(
+            status: currentStatus,
+            stepTimestamps: _buildStepTimestamps(order, currentStatus),
           ),
         ),
 
@@ -387,27 +369,71 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
 
   String _hm(DateTime dt) => DateFormat('HH:mm').format(dt.toLocal());
 
-  String _stepStatus(OrderStatus status, int idx) {
-    int progress;
-    switch (status) {
+  String _headlineFor(OrderStatus s) {
+    switch (s) {
       case OrderStatus.pending:
+        return 'Commande envoyée au restaurant';
       case OrderStatus.confirmed:
-        progress = 0;
+        return 'Commande acceptée';
       case OrderStatus.preparing:
+        return 'Votre commande est en préparation';
       case OrderStatus.ready:
       case OrderStatus.assigned:
-        progress = 1;
+        return 'Votre commande est prête';
       case OrderStatus.pickedUp:
+        return 'Votre livreur a récupéré la commande';
       case OrderStatus.delivering:
-        progress = 2;
+        return 'Votre commande arrive bientôt';
       case OrderStatus.delivered:
-        progress = 3;
+        return 'Commande livrée';
       case OrderStatus.cancelled:
-        progress = -1;
+        return 'Commande annulée';
     }
-    if (idx < progress) return 'done';
-    if (idx == progress) return 'active';
-    return 'future';
+  }
+
+  /// Horodatages étalés entre `createdAt` et `updatedAt` pour les étapes
+  /// franchies. Remplacer par les timestamps backend réels dès qu'ils sont
+  /// disponibles (ex: `order.timeline.preparingAt`).
+  List<DateTime?> _buildStepTimestamps(OrderModel order, OrderStatus status) {
+    final timestamps = List<DateTime?>.filled(7, null);
+    final progress = _progressFor(status);
+    if (progress <= 0) return timestamps;
+
+    timestamps[0] = order.createdAt;
+    if (progress >= 2) {
+      final start = order.createdAt;
+      final end = order.updatedAt.isAfter(start) ? order.updatedAt : DateTime.now();
+      final span = end.difference(start);
+      for (int i = 1; i < progress; i++) {
+        timestamps[i] = start.add(span * (i / (progress - 1)));
+      }
+    }
+    if (status == OrderStatus.delivered && order.delivery.deliveredAt != null) {
+      timestamps[6] = order.delivery.deliveredAt;
+    }
+    return timestamps;
+  }
+
+  int _progressFor(OrderStatus s) {
+    switch (s) {
+      case OrderStatus.delivered:
+        return 7;
+      case OrderStatus.delivering:
+        return 6;
+      case OrderStatus.pickedUp:
+        return 5;
+      case OrderStatus.ready:
+      case OrderStatus.assigned:
+        return 4;
+      case OrderStatus.preparing:
+        return 3;
+      case OrderStatus.confirmed:
+        return 2;
+      case OrderStatus.pending:
+        return 1;
+      case OrderStatus.cancelled:
+        return -1;
+    }
   }
 
   Future<void> _callRider(String? phone) async {
@@ -531,155 +557,6 @@ class _RoundBtn extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: Colors.white, size: 18),
-      ),
-    );
-  }
-}
-
-// ─── Timeline step ────────────────────────────────────────────────────────
-
-class _TimelineStep extends StatelessWidget {
-  final String label;
-  final String time;
-  final String description;
-  final String status; // 'done' | 'active' | 'future'
-  final bool isFirst;
-  final bool isLast;
-  final AnimationController pulseController;
-
-  const _TimelineStep({
-    required this.label,
-    required this.time,
-    required this.description,
-    required this.status,
-    this.isFirst = false,
-    this.isLast = false,
-    required this.pulseController,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDone = status == 'done';
-    final isActive = status == 'active';
-
-    final Color dotColor = isDone
-        ? AppColors.forestGreen
-        : isActive
-            ? AppColors.primary
-            : AppColors.outlineVariant;
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 32,
-            child: Column(
-              children: [
-                if (!isFirst)
-                  Container(
-                      width: 2,
-                      height: 6,
-                      color: isDone || isActive
-                          ? AppColors.forestGreen
-                          : AppColors.outlineVariant),
-                isActive
-                    ? AnimatedBuilder(
-                        animation: pulseController,
-                        builder: (_, __) => Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: dotColor.withValues(
-                                alpha: 0.25 + 0.35 * pulseController.value),
-                            border: Border.all(color: dotColor, width: 2),
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: dotColor,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isDone ? dotColor : Colors.transparent,
-                          border: Border.all(color: dotColor, width: 2),
-                        ),
-                        child: isDone
-                            ? const Icon(Icons.check,
-                                size: 12, color: Colors.white)
-                            : null,
-                      ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 2,
-                      constraints: const BoxConstraints(minHeight: 28),
-                      color: isDone
-                          ? AppColors.forestGreen
-                          : AppColors.outlineVariant,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontFamily: 'NunitoSans',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: isDone || isActive
-                              ? AppColors.charcoal
-                              : AppColors.textTertiary,
-                        ),
-                      ),
-                      if (time.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '— $time',
-                          style: const TextStyle(
-                            fontFamily: 'SpaceMono',
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontFamily: 'NunitoSans',
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
