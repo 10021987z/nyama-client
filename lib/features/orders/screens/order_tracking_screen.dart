@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/socket_provider.dart';
@@ -12,7 +15,40 @@ import '../data/models/order_models.dart';
 import '../providers/orders_provider.dart';
 import '../widgets/order_progress_timeline.dart';
 
-/// Écran 1.7 — Suivi commande temps réel.
+/// État de livraison dérivé des events socket `delivery:status`.
+///
+/// Backend émet `ASSIGNED` | `ARRIVED_RESTAURANT` | `PICKED_UP` |
+/// `ARRIVED_CLIENT` | `DELIVERED`.
+enum DeliveryStage {
+  none,
+  assigned,
+  arrivedRestaurant,
+  pickedUp,
+  arrivedClient,
+  delivered;
+
+  static DeliveryStage fromString(String? s) {
+    switch (s?.toUpperCase()) {
+      case 'ASSIGNED':
+        return DeliveryStage.assigned;
+      case 'ARRIVED_RESTAURANT':
+      case 'ARRIVED_RESTO':
+        return DeliveryStage.arrivedRestaurant;
+      case 'PICKED_UP':
+      case 'PICKEDUP':
+        return DeliveryStage.pickedUp;
+      case 'ARRIVED_CLIENT':
+      case 'ARRIVED':
+        return DeliveryStage.arrivedClient;
+      case 'DELIVERED':
+        return DeliveryStage.delivered;
+      default:
+        return DeliveryStage.none;
+    }
+  }
+}
+
+/// Écran 1.7 — Suivi commande temps réel avec carte OSM live rider.
 class OrderTrackingScreen extends ConsumerStatefulWidget {
   final String orderId;
 
@@ -24,13 +60,21 @@ class OrderTrackingScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
-  GoogleMapController? _mapController;
   OrderStatus? _liveStatus;
+  DeliveryStage _stage = DeliveryStage.none;
+  String? _banner;
   Timer? _pollTimer;
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
 
-  final DateTime _eta = DateTime.now().add(const Duration(minutes: 12));
+  // Live rider tracking
+  LatLng? _riderPos;
+  DeliveryModel? _liveRider;
+  final MapController _mapController = MapController();
+
+  // ETA calculation — mis à jour dès qu'on a la position du rider.
+  DateTime _eta = DateTime.now().add(const Duration(minutes: 20));
+
+  // Vitesse moyenne Douala/Yaoundé = 25 km/h
+  static const double _avgSpeedKmh = 25.0;
 
   @override
   void initState() {
@@ -41,65 +85,171 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     });
   }
 
+  // ─── Socket setup ────────────────────────────────────────────────────────
+
   void _setupSocket() {
     final socket = ref.read(socketServiceProvider);
     socket.emit('order:join', {'orderId': widget.orderId});
 
-    // tracking:update → met à jour la position du livreur
-    socket.on('tracking:update', (data) {
-      if (!mounted || data is! Map) return;
-      final lat = (data['lat'] as num?)?.toDouble();
-      final lng = (data['lng'] as num?)?.toDouble();
-      if (lat == null || lng == null) return;
-
-      final pos = LatLng(lat, lng);
-      setState(() {
-        _markers.removeWhere((m) => m.markerId.value == 'rider');
-        _markers.add(Marker(
-          markerId: const MarkerId('rider'),
-          position: pos,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueOrange),
-          infoWindow: const InfoWindow(title: 'Kevin'),
-        ));
-        _updatePolyline(pos);
-      });
-      _mapController?.animateCamera(CameraUpdate.newLatLng(pos));
-    });
-
-    // order:status → met à jour l'étape active
-    socket.on('order:status', (data) {
-      if (!mounted || data is! Map) return;
-      final status = OrderStatus.fromString(data['status'] as String?);
-      setState(() => _liveStatus = status);
-      ref.invalidate(orderDetailProvider(widget.orderId));
-    });
+    socket.on('order:status', _onOrderStatus);
+    socket.on('delivery:status', _onDeliveryStatus);
+    socket.on('rider:location', _onRiderLocation);
+    // Back-compat avec la version précédente (tracking:update = rider:location)
+    socket.on('tracking:update', _onRiderLocation);
   }
 
-  void _updatePolyline(LatLng rider) {
+  void _onOrderStatus(dynamic data) {
+    if (!mounted || data is! Map) return;
+    final status = OrderStatus.fromString(data['status'] as String?);
+    setState(() => _liveStatus = status);
+    ref.invalidate(orderDetailProvider(widget.orderId));
+  }
+
+  void _onDeliveryStatus(dynamic data) {
+    if (!mounted || data is! Map) return;
+    final stage = DeliveryStage.fromString(data['status'] as String?);
+
+    // Certains backends intègrent la position rider dans delivery:status.
+    final lat = (data['lat'] as num?)?.toDouble() ??
+        (data['riderLat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble() ??
+        (data['riderLng'] as num?)?.toDouble();
+    if (lat != null && lng != null) {
+      _updateRiderPos(LatLng(lat, lng));
+    }
+
+    // Hydrate rider info depuis le payload — premier event ASSIGNED
+    // contient généralement nom/photo/véhicule/plaque.
+    final name = data['riderName'] as String? ?? data['name'] as String?;
+    final phone = data['riderPhone'] as String? ?? data['phone'] as String?;
+    final photo = data['riderPhotoUrl'] as String? ??
+        data['photoUrl'] as String? ??
+        data['avatarUrl'] as String?;
+    final vehicleType = data['riderVehicleType'] as String? ??
+        data['vehicleType'] as String?;
+    final vehicleModel = data['riderVehicleModel'] as String? ??
+        data['vehicleModel'] as String?;
+    final plate = data['riderPlate'] as String? ??
+        data['licensePlate'] as String? ??
+        data['plate'] as String?;
+    final rating = (data['riderRating'] as num?)?.toDouble() ??
+        (data['rating'] as num?)?.toDouble();
+
     final order = ref.read(orderDetailProvider(widget.orderId)).value;
-    if (order?.delivery.lat == null || order?.delivery.lng == null) return;
-    final dest = LatLng(order!.delivery.lat!, order.delivery.lng!);
-    _polylines
-      ..clear()
-      ..add(Polyline(
-        polylineId: const PolylineId('route'),
-        points: [rider, dest],
-        color: AppColors.primary,
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ));
+    final base = _liveRider ?? order?.delivery ?? const DeliveryModel();
+    final hydrated = base.copyWith(
+      riderName: name,
+      riderPhone: phone,
+      riderPhotoUrl: photo,
+      riderVehicleType: vehicleType,
+      riderVehicleModel: vehicleModel,
+      riderPlate: plate,
+      riderRating: rating,
+    );
+
+    setState(() {
+      _stage = stage;
+      _liveRider = hydrated;
+      _banner = _bannerFor(stage);
+    });
+
+    if (stage == DeliveryStage.arrivedClient) {
+      _triggerArrivalFeedback();
+    }
+
+    ref.invalidate(orderDetailProvider(widget.orderId));
   }
+
+  void _onRiderLocation(dynamic data) {
+    if (!mounted || data is! Map) return;
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) return;
+    _updateRiderPos(LatLng(lat, lng));
+  }
+
+  void _updateRiderPos(LatLng pos) {
+    final order = ref.read(orderDetailProvider(widget.orderId)).value;
+    setState(() {
+      _riderPos = pos;
+      if (order?.delivery.lat != null && order?.delivery.lng != null) {
+        final dist = _haversineKm(
+          pos,
+          LatLng(order!.delivery.lat!, order.delivery.lng!),
+        );
+        final minutes = (dist / _avgSpeedKmh * 60).round().clamp(1, 180);
+        _eta = DateTime.now().add(Duration(minutes: minutes));
+      }
+    });
+
+    // Recentre la carte si on est en mode carte live (PICKED_UP+)
+    if (_showLiveMap && mounted) {
+      try {
+        _mapController.move(pos, _mapController.camera.zoom);
+      } catch (_) {
+        // MapController pas encore attaché — ignore.
+      }
+    }
+  }
+
+  void _triggerArrivalFeedback() {
+    HapticFeedback.heavyImpact();
+    // Fallback "notification locale" : SnackBar persistant — `flutter_local_notifications`
+    // n'est pas encore installé. Firebase FCM gère déjà le push cloud côté prod.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Votre livreur est arrivé !',
+            style: TextStyle(
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    });
+  }
+
+  String? _bannerFor(DeliveryStage s) {
+    switch (s) {
+      case DeliveryStage.arrivedRestaurant:
+        return 'Le livreur est arrivé au restaurant';
+      case DeliveryStage.pickedUp:
+        return 'Le livreur a récupéré votre commande, il arrive !';
+      case DeliveryStage.arrivedClient:
+        return 'Votre livreur est arrivé !';
+      case DeliveryStage.assigned:
+      case DeliveryStage.delivered:
+      case DeliveryStage.none:
+        return null;
+    }
+  }
+
+  bool get _showLiveMap =>
+      _stage == DeliveryStage.pickedUp ||
+      _stage == DeliveryStage.arrivedClient ||
+      (_liveStatus == OrderStatus.pickedUp ||
+          _liveStatus == OrderStatus.delivering);
+
+  // ─── Dispose ─────────────────────────────────────────────────────────────
 
   @override
   void dispose() {
     final socket = ref.read(socketServiceProvider);
-    socket.off('tracking:update');
     socket.off('order:status');
+    socket.off('delivery:status');
+    socket.off('rider:location');
+    socket.off('tracking:update');
     _pollTimer?.cancel();
-    _mapController?.dispose();
     super.dispose();
   }
+
+  // ─── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -141,178 +291,45 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   }
 
   Widget _buildContent(OrderModel order) {
-    final hasDest = order.delivery.lat != null && order.delivery.lng != null;
-    final destLatLng =
-        hasDest ? LatLng(order.delivery.lat!, order.delivery.lng!)
-                : const LatLng(4.0503, 9.7679);
-
-    // Position du restaurant (mock — à remplacer par les vraies données)
-    const restaurantLatLng = LatLng(4.0445, 9.6966);
-
-    // Point milieu pour le livreur (simulation)
-    final riderLatLng = LatLng(
-      (restaurantLatLng.latitude + destLatLng.latitude) / 2,
-      (restaurantLatLng.longitude + destLatLng.longitude) / 2,
-    );
-
-    // Marqueur restaurant (orange)
-    _markers.removeWhere((m) => m.markerId.value == 'restaurant');
-    _markers.add(Marker(
-      markerId: const MarkerId('restaurant'),
-      position: restaurantLatLng,
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-      infoWindow: InfoWindow(
-        title: order.items.isNotEmpty ? order.items.first.name : 'Restaurant',
-      ),
-    ));
-
-    // Marqueur client (vert)
-    _markers.removeWhere((m) => m.markerId.value == 'destination');
-    _markers.add(Marker(
-      markerId: const MarkerId('destination'),
-      position: destLatLng,
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      infoWindow: const InfoWindow(title: 'Chez vous'),
-    ));
-
-    // Marqueur livreur (bleu) — au milieu du trajet par défaut
-    if (_markers.every((m) => m.markerId.value != 'rider')) {
-      _markers.add(Marker(
-        markerId: const MarkerId('rider'),
-        position: riderLatLng,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        infoWindow: const InfoWindow(title: 'Kevin — En route'),
-      ));
-    }
-
-    // Polyline restaurant → livreur → client
-    final riderPos = _markers
-        .firstWhere((m) => m.markerId.value == 'rider')
-        .position;
-    _polylines
-      ..clear()
-      ..add(Polyline(
-        polylineId: const PolylineId('route'),
-        points: [restaurantLatLng, riderPos, destLatLng],
-        color: AppColors.primary,
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ));
-
-    // Calcul du centre pour la caméra
-    final centerLat = (restaurantLatLng.latitude + destLatLng.latitude) / 2;
-    final centerLng = (restaurantLatLng.longitude + destLatLng.longitude) / 2;
-
     final currentStatus = _liveStatus ?? order.status;
     final etaMin = _eta.difference(DateTime.now()).inMinutes.clamp(0, 999);
+    final rider = _liveRider ?? order.delivery;
+
+    final hasRider = (rider.riderName ?? '').isNotEmpty ||
+        (rider.riderPhone ?? '').isNotEmpty ||
+        _stage.index >= DeliveryStage.assigned.index;
 
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        // ── Carte (40%) avec ETA en overlay ──────────────────────────
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.40,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: LatLng(centerLat, centerLng),
-                    zoom: 13,
-                  ),
-                  markers: Set.from(_markers),
-                  polylines: Set.from(_polylines),
-                  onMapCreated: (c) {
-                    _mapController = c;
-                    // Ajuste la vue pour inclure tous les points
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      final bounds = LatLngBounds(
-                        southwest: LatLng(
-                          [restaurantLatLng.latitude, destLatLng.latitude, riderPos.latitude]
-                              .reduce((a, b) => a < b ? a : b),
-                          [restaurantLatLng.longitude, destLatLng.longitude, riderPos.longitude]
-                              .reduce((a, b) => a < b ? a : b),
-                        ),
-                        northeast: LatLng(
-                          [restaurantLatLng.latitude, destLatLng.latitude, riderPos.latitude]
-                              .reduce((a, b) => a > b ? a : b),
-                          [restaurantLatLng.longitude, destLatLng.longitude, riderPos.longitude]
-                              .reduce((a, b) => a > b ? a : b),
-                        ),
-                      );
-                      c.animateCamera(
-                        CameraUpdate.newLatLngBounds(bounds, 60),
-                      );
-                    });
-                  },
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                  mapToolbarEnabled: false,
-                ),
-              ),
-              // ETA overlay card
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceWhite,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: AppColors.cardShadow,
-                        blurRadius: 16,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'ESTIMATION',
-                        style: TextStyle(
-                          fontFamily: 'NunitoSans',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Arrivée dans ~$etaMin min',
-                        style: const TextStyle(
-                          fontFamily: 'SpaceMono',
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+        // ── Carte live rider (haut) — ~220dp, visible dès PICKED_UP ───
+        if (_showLiveMap) _buildLiveMap(order),
+
+        // ── Bannière statut delivery ─────────────────────────────────
+        if (_banner != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: _Banner(
+              message: _banner!,
+              stage: _stage,
+            ),
           ),
-        ),
 
         const SizedBox(height: 16),
 
-        // ── Info livreur ────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _RiderCard(
-            phone: order.delivery.riderPhone,
-            onCall: () => _callRider(order.delivery.riderPhone),
+        // ── Card rider (dès ASSIGNED) ────────────────────────────────
+        if (hasRider)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _RiderCard(
+              rider: rider,
+              onCall: () => _callRider(rider.riderPhone),
+            ),
           ),
-        ),
 
         const SizedBox(height: 24),
 
-        // ── Header statut (dynamique) + ETA ─────────────────────────
+        // ── Header statut dynamique + ETA ────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
@@ -332,7 +349,9 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
               if (currentStatus != OrderStatus.delivered &&
                   currentStatus != OrderStatus.cancelled)
                 Text(
-                  'Livraison estimée : ${_hm(_eta)}',
+                  _showLiveMap
+                      ? 'Arrivée dans ~$etaMin min • ${_hm(_eta)}'
+                      : 'Livraison estimée : ${_hm(_eta)}',
                   style: const TextStyle(
                     fontFamily: 'SpaceMono',
                     fontSize: 14,
@@ -345,7 +364,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
 
         const SizedBox(height: 20),
 
-        // ── Timeline 7 étapes ───────────────────────────────────────
+        // ── Timeline 7 étapes ────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: OrderProgressTimeline(
@@ -356,7 +375,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
 
         const SizedBox(height: 16),
 
-        // ── Détail commande footer ──────────────────────────────────
+        // ── Détail commande footer ───────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: _OrderFooter(order: order),
@@ -366,6 +385,92 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
       ],
     );
   }
+
+  // ─── Live map ────────────────────────────────────────────────────────────
+
+  Widget _buildLiveMap(OrderModel order) {
+    final destLat = order.delivery.lat ?? 4.0511;
+    final destLng = order.delivery.lng ?? 9.7679;
+    final dest = LatLng(destLat, destLng);
+
+    // Position rider : dernière connue, sinon point d'approche estimé.
+    final rider = _riderPos ??
+        LatLng(destLat + 0.006, destLng + 0.006);
+
+    final mid = LatLng(
+      (rider.latitude + dest.latitude) / 2,
+      (rider.longitude + dest.longitude) / 2,
+    );
+
+    return SizedBox(
+      height: 220,
+      child: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: mid,
+          initialZoom: 14,
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+          ),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.nyama.client',
+            maxZoom: 19,
+          ),
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: [rider, dest],
+                color: AppColors.primary,
+                strokeWidth: 4,
+              ),
+            ],
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: dest,
+                width: 44,
+                height: 44,
+                child: const _MapPin(
+                  color: AppColors.forestGreen,
+                  icon: Icons.home_rounded,
+                ),
+              ),
+              Marker(
+                point: rider,
+                width: 48,
+                height: 48,
+                child: const _MapPin(
+                  color: AppColors.primary,
+                  icon: Icons.delivery_dining_rounded,
+                  pulse: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Haversine distance ─────────────────────────────────────────────────
+
+  double _haversineKm(LatLng a, LatLng b) {
+    const r = 6371.0;
+    double toRad(double d) => d * math.pi / 180.0;
+    final dLat = toRad(b.latitude - a.latitude);
+    final dLng = toRad(b.longitude - a.longitude);
+    final la1 = toRad(a.latitude);
+    final la2 = toRad(b.latitude);
+    final h = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(la1) * math.cos(la2) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return 2 * r * math.asin(math.sqrt(h));
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
 
   String _hm(DateTime dt) => DateFormat('HH:mm').format(dt.toLocal());
 
@@ -391,9 +496,6 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     }
   }
 
-  /// Horodatages étalés entre `createdAt` et `updatedAt` pour les étapes
-  /// franchies. Remplacer par les timestamps backend réels dès qu'ils sont
-  /// disponibles (ex: `order.timeline.preparingAt`).
   List<DateTime?> _buildStepTimestamps(OrderModel order, OrderStatus status) {
     final timestamps = List<DateTime?>.filled(7, null);
     final progress = _progressFor(status);
@@ -443,22 +545,179 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   }
 }
 
-// ─── Rider card ───────────────────────────────────────────────────────────
+// ─── Banner ─────────────────────────────────────────────────────────────────
+
+class _Banner extends StatelessWidget {
+  final String message;
+  final DeliveryStage stage;
+
+  const _Banner({required this.message, required this.stage});
+
+  IconData get _icon {
+    switch (stage) {
+      case DeliveryStage.arrivedRestaurant:
+        return Icons.restaurant_rounded;
+      case DeliveryStage.pickedUp:
+        return Icons.delivery_dining_rounded;
+      case DeliveryStage.arrivedClient:
+        return Icons.location_on_rounded;
+      default:
+        return Icons.info_outline_rounded;
+    }
+  }
+
+  Color get _bg {
+    switch (stage) {
+      case DeliveryStage.arrivedClient:
+        return AppColors.primary;
+      case DeliveryStage.pickedUp:
+        return AppColors.forestGreen;
+      default:
+        return AppColors.primaryLight;
+    }
+  }
+
+  Color get _fg {
+    switch (stage) {
+      case DeliveryStage.arrivedClient:
+      case DeliveryStage.pickedUp:
+        return Colors.white;
+      default:
+        return AppColors.charcoal;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(_icon, color: _fg, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _fg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Map pin ────────────────────────────────────────────────────────────────
+
+class _MapPin extends StatefulWidget {
+  final Color color;
+  final IconData icon;
+  final bool pulse;
+
+  const _MapPin({
+    required this.color,
+    required this.icon,
+    this.pulse = false,
+  });
+
+  @override
+  State<_MapPin> createState() => _MapPinState();
+}
+
+class _MapPinState extends State<_MapPin> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    if (widget.pulse) _ctrl.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: widget.color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Icon(widget.icon, color: Colors.white, size: 18),
+    );
+
+    if (!widget.pulse) return Center(child: dot);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final v = _ctrl.value;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 36 + v * 16,
+              height: 36 + v * 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.color.withValues(alpha: 0.25 * (1 - v)),
+              ),
+            ),
+            dot,
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ─── Rider card ─────────────────────────────────────────────────────────────
 
 class _RiderCard extends StatelessWidget {
-  final String? phone;
+  final DeliveryModel rider;
   final VoidCallback onCall;
 
-  const _RiderCard({required this.phone, required this.onCall});
+  const _RiderCard({required this.rider, required this.onCall});
 
   Future<void> _sms() async {
-    final number = phone ?? '+237699000000';
+    final number = rider.riderPhone ?? '+237699000000';
     final uri = Uri.parse('sms:$number');
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
   @override
   Widget build(BuildContext context) {
+    final name = rider.riderName ?? 'Livreur';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'L';
+    final vehicle = [
+      if ((rider.riderVehicleType ?? '').isNotEmpty) rider.riderVehicleType,
+      if ((rider.riderVehicleModel ?? '').isNotEmpty) rider.riderVehicleModel,
+    ].whereType<String>().join(' • ');
+    final plate = rider.riderPlate;
+    final rating = rider.riderRating;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -476,18 +735,23 @@ class _RiderCard extends StatelessWidget {
         children: [
           Stack(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 28,
                 backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  'K',
-                  style: TextStyle(
-                    fontFamily: 'Montserrat',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
+                backgroundImage: (rider.riderPhotoUrl ?? '').isNotEmpty
+                    ? NetworkImage(rider.riderPhotoUrl!)
+                    : null,
+                child: (rider.riderPhotoUrl ?? '').isEmpty
+                    ? Text(
+                        initial,
+                        style: const TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : null,
               ),
               Positioned(
                 right: 0,
@@ -505,28 +769,60 @@ class _RiderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Kevin',
-                  style: TextStyle(
-                    fontFamily: 'Montserrat',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.charcoal,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.charcoal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (rating != null) ...[
+                      const SizedBox(width: 6),
+                      const Icon(Icons.star_rounded,
+                          size: 14, color: Color(0xFFF5A623)),
+                      const SizedBox(width: 2),
+                      Text(
+                        rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontFamily: 'SpaceMono',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.charcoal,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                SizedBox(height: 2),
-                Text(
-                  'Moto • Honda CB 125',
-                  style: TextStyle(
-                    fontFamily: 'NunitoSans',
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                const SizedBox(height: 2),
+                if (vehicle.isNotEmpty)
+                  Text(
+                    vehicle,
+                    style: const TextStyle(
+                      fontFamily: 'NunitoSans',
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
+                if ((plate ?? '').isNotEmpty)
+                  Text(
+                    'Plaque : $plate',
+                    style: const TextStyle(
+                      fontFamily: 'SpaceMono',
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -657,3 +953,12 @@ class _OrderFooter extends StatelessWidget {
     );
   }
 }
+
+// ─── TODO BACKEND ───────────────────────────────────────────────────────────
+// Pour que la carte live fonctionne à 100%, le backend doit émettre :
+//   - `rider:location` { orderId, riderId, lat, lng } toutes les 5s
+//     après l'event `delivery:status` PICKED_UP.
+//   - `delivery:status` avec payload { orderId, status, riderName, riderPhone,
+//     riderPhotoUrl, riderVehicleType, riderVehicleModel, riderPlate,
+//     riderRating, lat?, lng? }.
+// Ces fields optionnels sont tous absorbés par _onDeliveryStatus / _onRiderLocation.

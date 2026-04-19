@@ -37,6 +37,10 @@ dependencies:
   # Carte suivi livreur + sélection adresse
   google_maps_flutter: ^2.9.0
 
+  # Carte OSM + polyline pour suivi rider temps réel
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+
   # HTTP pour Google Places API
   http: ^1.2.0
 

@@ -39,6 +39,11 @@ class PaymentModel {
 class DeliveryModel {
   final String? riderName;
   final String? riderPhone;
+  final String? riderPhotoUrl;
+  final String? riderVehicleType; // 'Moto', 'Scooter', 'Voiture'…
+  final String? riderVehicleModel; // 'Honda CB 125'
+  final String? riderPlate;
+  final double? riderRating;
   final String? address;
   final String? repere;
   final double? lat;
@@ -49,6 +54,11 @@ class DeliveryModel {
   const DeliveryModel({
     this.riderName,
     this.riderPhone,
+    this.riderPhotoUrl,
+    this.riderVehicleType,
+    this.riderVehicleModel,
+    this.riderPlate,
+    this.riderRating,
     this.address,
     this.repere,
     this.lat,
@@ -60,6 +70,13 @@ class DeliveryModel {
   factory DeliveryModel.fromJson(Map<String, dynamic> json) => DeliveryModel(
         riderName: json['riderName'] as String?,
         riderPhone: json['riderPhone'] as String?,
+        riderPhotoUrl: json['riderPhotoUrl'] as String? ??
+            json['riderAvatarUrl'] as String?,
+        riderVehicleType: json['riderVehicleType'] as String?,
+        riderVehicleModel: json['riderVehicleModel'] as String?,
+        riderPlate: json['riderPlate'] as String? ??
+            json['riderLicensePlate'] as String?,
+        riderRating: (json['riderRating'] as num?)?.toDouble(),
         address: json['address'] as String?,
         repere: json['repere'] as String?,
         lat: (json['lat'] as num?)?.toDouble(),
@@ -70,6 +87,37 @@ class DeliveryModel {
         deliveredAt: json['deliveredAt'] != null
             ? DateTime.tryParse(json['deliveredAt'] as String)
             : null,
+      );
+
+  DeliveryModel copyWith({
+    String? riderName,
+    String? riderPhone,
+    String? riderPhotoUrl,
+    String? riderVehicleType,
+    String? riderVehicleModel,
+    String? riderPlate,
+    double? riderRating,
+    String? address,
+    String? repere,
+    double? lat,
+    double? lng,
+    DateTime? estimatedAt,
+    DateTime? deliveredAt,
+  }) =>
+      DeliveryModel(
+        riderName: riderName ?? this.riderName,
+        riderPhone: riderPhone ?? this.riderPhone,
+        riderPhotoUrl: riderPhotoUrl ?? this.riderPhotoUrl,
+        riderVehicleType: riderVehicleType ?? this.riderVehicleType,
+        riderVehicleModel: riderVehicleModel ?? this.riderVehicleModel,
+        riderPlate: riderPlate ?? this.riderPlate,
+        riderRating: riderRating ?? this.riderRating,
+        address: address ?? this.address,
+        repere: repere ?? this.repere,
+        lat: lat ?? this.lat,
+        lng: lng ?? this.lng,
+        estimatedAt: estimatedAt ?? this.estimatedAt,
+        deliveredAt: deliveredAt ?? this.deliveredAt,
       );
 }
 
