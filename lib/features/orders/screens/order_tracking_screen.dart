@@ -59,14 +59,19 @@ class OrderTrackingScreen extends ConsumerStatefulWidget {
       _OrderTrackingScreenState();
 }
 
-class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
+class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
+    with TickerProviderStateMixin {
   OrderStatus? _liveStatus;
   DeliveryStage _stage = DeliveryStage.none;
   String? _banner;
   Timer? _pollTimer;
+  bool _navigatedToRating = false;
 
   // Live rider tracking
   LatLng? _riderPos;
+  LatLng? _riderTargetPos;
+  LatLng? _riderPrevPos;
+  AnimationController? _riderAnim;
   DeliveryModel? _liveRider;
   final MapController _mapController = MapController();
 
@@ -79,6 +84,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _riderAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..addListener(_onRiderTween);
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
     // Polling fallback 5s : rafraîchit la commande tant qu'elle n'est pas
     // DELIVERED ou CANCELLED. Sert de safety net si le socket ne pousse pas
@@ -100,6 +109,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
 
   void _setupSocket() {
     final socket = ref.read(socketServiceProvider);
+    // Backend (events.gateway.ts) expose 'order:subscribe' pour rejoindre la
+    // room `order-<id>`. L'ancien nom `order:join` n'est pas routé côté NestJS
+    // → on envoie les deux pour être robuste aux déploiements mixtes.
+    socket.emit('order:subscribe', {'orderId': widget.orderId});
     socket.emit('order:join', {'orderId': widget.orderId});
 
     socket.on('order:status', _onOrderStatus);
@@ -113,8 +126,54 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   void _onOrderStatus(dynamic data) {
     if (!mounted || data is! Map) return;
     final status = OrderStatus.fromString(data['status'] as String?);
-    setState(() => _liveStatus = status);
+
+    // Depuis LOT 1, le backend pousse `deliveryStatus` (ex: ARRIVED_CLIENT) et
+    // un objet `rider` (id, name, phone, photo, vehicleType, plateNumber) dans
+    // le payload `order:status`. On hydrate le DeliveryStage et la card rider.
+    final deliveryStatusRaw = data['deliveryStatus'] as String?;
+    final newStage = deliveryStatusRaw != null
+        ? DeliveryStage.fromString(deliveryStatusRaw)
+        : null;
+    _hydrateRiderFromPayload(data);
+
+    // Le backend émet `order:status = PICKED_UP` pour PICKED_UP ET pour
+    // ARRIVED_CLIENT. Pour que le point "En route" s'allume (au lieu de rester
+    // à "Récupérée"), on promeut en `delivering` dès qu'on sait (via
+    // deliveryStatus ou stage) que le livreur est au moins en route.
+    OrderStatus effective = status;
+    if (newStage == DeliveryStage.pickedUp ||
+        newStage == DeliveryStage.arrivedClient ||
+        _stage == DeliveryStage.pickedUp ||
+        _stage == DeliveryStage.arrivedClient) {
+      if (_progressFor(OrderStatus.delivering) > _progressFor(effective)) {
+        effective = OrderStatus.delivering;
+      }
+    }
+
+    setState(() {
+      // N'autorise pas la timeline à régresser si un event tardif arrive.
+      final current = _liveStatus;
+      if (current == null ||
+          _progressFor(effective) >= _progressFor(current) ||
+          effective == OrderStatus.cancelled) {
+        _liveStatus = effective;
+      }
+      if (newStage != null && newStage != DeliveryStage.none) {
+        _stage = newStage;
+        _banner = _bannerFor(newStage);
+      }
+    });
     ref.invalidate(orderDetailProvider(widget.orderId));
+
+    // Vibration + ouverture écran notation quand la livraison est terminée.
+    if (status == OrderStatus.delivered) {
+      _triggerDeliveredFeedback();
+      _navigateToRating();
+    }
+    if (newStage == DeliveryStage.arrivedClient) {
+      _triggerArrivalFeedback();
+    }
+
     // Arrête le polling dès qu'on atteint un état terminal.
     if (status == OrderStatus.delivered ||
         status == OrderStatus.cancelled) {
@@ -124,36 +183,8 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
 
   void _onOrderAssigned(dynamic data) {
     if (!mounted || data is! Map) return;
-
-    final name = data['riderName'] as String? ?? data['name'] as String?;
-    final phone = data['riderPhone'] as String? ?? data['phone'] as String?;
-    final photo = data['riderPhotoUrl'] as String? ??
-        data['photoUrl'] as String? ??
-        data['avatarUrl'] as String?;
-    final vehicleType = data['riderVehicleType'] as String? ??
-        data['vehicleType'] as String?;
-    final vehicleModel = data['riderVehicleModel'] as String? ??
-        data['vehicleModel'] as String?;
-    final plate = data['riderPlate'] as String? ??
-        data['licensePlate'] as String? ??
-        data['plate'] as String?;
-    final rating = (data['riderRating'] as num?)?.toDouble() ??
-        (data['rating'] as num?)?.toDouble();
-
-    final order = ref.read(orderDetailProvider(widget.orderId)).value;
-    final base = _liveRider ?? order?.delivery ?? const DeliveryModel();
-    final hydrated = base.copyWith(
-      riderName: name,
-      riderPhone: phone,
-      riderPhotoUrl: photo,
-      riderVehicleType: vehicleType,
-      riderVehicleModel: vehicleModel,
-      riderPlate: plate,
-      riderRating: rating,
-    );
-
+    _hydrateRiderFromPayload(data);
     setState(() {
-      _liveRider = hydrated;
       if (_stage == DeliveryStage.none) _stage = DeliveryStage.assigned;
     });
     ref.invalidate(orderDetailProvider(widget.orderId));
@@ -172,22 +203,96 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
       _updateRiderPos(LatLng(lat, lng));
     }
 
-    // Hydrate rider info depuis le payload — premier event ASSIGNED
-    // contient généralement nom/photo/véhicule/plaque.
-    final name = data['riderName'] as String? ?? data['name'] as String?;
-    final phone = data['riderPhone'] as String? ?? data['phone'] as String?;
-    final photo = data['riderPhotoUrl'] as String? ??
-        data['photoUrl'] as String? ??
-        data['avatarUrl'] as String?;
-    final vehicleType = data['riderVehicleType'] as String? ??
-        data['vehicleType'] as String?;
-    final vehicleModel = data['riderVehicleModel'] as String? ??
-        data['vehicleModel'] as String?;
-    final plate = data['riderPlate'] as String? ??
-        data['licensePlate'] as String? ??
-        data['plate'] as String?;
-    final rating = (data['riderRating'] as num?)?.toDouble() ??
-        (data['rating'] as num?)?.toDouble();
+    _hydrateRiderFromPayload(data);
+
+    // Mapping delivery.status → OrderStatus pour faire avancer la timeline 7
+    // étapes même quand le backend n'envoie pas d'event `order:status` séparé.
+    //   PICKED_UP / ARRIVED_CLIENT → `delivering` (point "En route" allumé,
+    //                                  point "Récupérée" déjà franchi).
+    //   DELIVERED                  → `delivered` (tous les points allumés).
+    OrderStatus? promoted;
+    switch (stage) {
+      case DeliveryStage.pickedUp:
+      case DeliveryStage.arrivedClient:
+        promoted = OrderStatus.delivering;
+        break;
+      case DeliveryStage.delivered:
+        promoted = OrderStatus.delivered;
+        break;
+      case DeliveryStage.assigned:
+        // "Prête" reste l'état côté client. L'écran allume juste la card rider.
+        break;
+      case DeliveryStage.arrivedRestaurant:
+      case DeliveryStage.none:
+        break;
+    }
+
+    setState(() {
+      _stage = stage;
+      _banner = _bannerFor(stage);
+      if (promoted != null) {
+        // Ne jamais régresser la timeline — on garde le plus avancé des deux.
+        final current = _liveStatus;
+        if (current == null ||
+            _progressFor(promoted) > _progressFor(current)) {
+          _liveStatus = promoted;
+        }
+      }
+    });
+
+    if (stage == DeliveryStage.arrivedClient) {
+      _triggerArrivalFeedback();
+    }
+    if (stage == DeliveryStage.delivered) {
+      _triggerDeliveredFeedback();
+      _navigateToRating();
+      _pollTimer?.cancel();
+    }
+
+    ref.invalidate(orderDetailProvider(widget.orderId));
+  }
+
+  /// Hydrate `_liveRider` depuis un payload backend. Accepte aussi bien les
+  /// champs plats (`riderName`, `riderPhone`, …) que le nesting produit par le
+  /// LOT 1 : `rider: { id, name, phone, photo, vehicleType, plateNumber }`.
+  void _hydrateRiderFromPayload(Map data) {
+    final Map? riderObj = data['rider'] is Map
+        ? data['rider'] as Map
+        : (data['driver'] is Map ? data['driver'] as Map : null);
+
+    dynamic lookup(Map? src, String k) => src?[k];
+    String? read(String a, [String? b, String? c]) {
+      final v = data[a] ??
+          (b == null ? null : data[b]) ??
+          (c == null ? null : data[c]) ??
+          lookup(riderObj, a) ??
+          (b == null ? null : lookup(riderObj, b)) ??
+          (c == null ? null : lookup(riderObj, c));
+      return v?.toString();
+    }
+
+    final name = read('riderName', 'name');
+    final phone = read('riderPhone', 'phone', 'phoneNumber');
+    final photo = read('riderPhotoUrl', 'photoUrl', 'photo') ??
+        read('riderAvatarUrl', 'avatarUrl');
+    final vehicleType = read('riderVehicleType', 'vehicleType');
+    final vehicleModel = read('riderVehicleModel', 'vehicleModel');
+    final plate = read('riderPlate', 'licensePlate', 'plate') ??
+        read('plateNumber');
+    final ratingRaw = data['riderRating'] ?? data['rating'] ??
+        riderObj?['rating'];
+    final rating = ratingRaw is num ? ratingRaw.toDouble() : null;
+
+    // Si rien n'est présent, on ne modifie pas l'état rider existant.
+    if (name == null &&
+        phone == null &&
+        photo == null &&
+        vehicleType == null &&
+        vehicleModel == null &&
+        plate == null &&
+        rating == null) {
+      return;
+    }
 
     final order = ref.read(orderDetailProvider(widget.orderId)).value;
     final base = _liveRider ?? order?.delivery ?? const DeliveryModel();
@@ -200,18 +305,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
       riderPlate: plate,
       riderRating: rating,
     );
-
-    setState(() {
-      _stage = stage;
-      _liveRider = hydrated;
-      _banner = _bannerFor(stage);
-    });
-
-    if (stage == DeliveryStage.arrivedClient) {
-      _triggerArrivalFeedback();
-    }
-
-    ref.invalidate(orderDetailProvider(widget.orderId));
+    setState(() => _liveRider = hydrated);
   }
 
   void _onRiderLocation(dynamic data) {
@@ -222,10 +316,20 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     _updateRiderPos(LatLng(lat, lng));
   }
 
+  /// Met à jour la position rider avec une interpolation (tween) depuis la
+  /// dernière position connue. Évite les sauts brusques quand le backend émet
+  /// `rider:location` toutes les 5s (lerp 900ms entre 2 points GPS).
   void _updateRiderPos(LatLng pos) {
     final order = ref.read(orderDetailProvider(widget.orderId)).value;
+    // Démarre l'animation depuis la position courante → nouvelle cible.
+    _riderPrevPos = _riderPos ?? pos;
+    _riderTargetPos = pos;
+    _riderAnim
+      ?..stop()
+      ..value = 0
+      ..forward();
+
     setState(() {
-      _riderPos = pos;
       if (order?.delivery.lat != null && order?.delivery.lng != null) {
         final dist = _haversineKm(
           pos,
@@ -236,7 +340,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
       }
     });
 
-    // Recentre la carte si on est en mode carte live (PICKED_UP+)
+    // Recentre la carte sur la cible finale (la tween n'affecte que le marker).
     if (_showLiveMap && mounted) {
       try {
         _mapController.move(pos, _mapController.camera.zoom);
@@ -246,8 +350,27 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     }
   }
 
+  /// Callback ticker : interpole linéairement de `_riderPrevPos` → `_riderTargetPos`
+  /// et met à jour `_riderPos` pour le rebuild du marker.
+  void _onRiderTween() {
+    final ctrl = _riderAnim;
+    final from = _riderPrevPos;
+    final to = _riderTargetPos;
+    if (ctrl == null || from == null || to == null) return;
+    final t = Curves.easeInOut.transform(ctrl.value);
+    final lat = from.latitude + (to.latitude - from.latitude) * t;
+    final lng = from.longitude + (to.longitude - from.longitude) * t;
+    if (!mounted) return;
+    setState(() => _riderPos = LatLng(lat, lng));
+  }
+
   void _triggerArrivalFeedback() {
-    HapticFeedback.heavyImpact();
+    HapticFeedback.mediumImpact();
+    // Deuxième impulsion après 120ms pour une vraie alerte tactile.
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+    });
     // Fallback "notification locale" : SnackBar persistant — `flutter_local_notifications`
     // n'est pas encore installé. Firebase FCM gère déjà le push cloud côté prod.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -269,6 +392,50 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     });
   }
 
+  void _triggerDeliveredFeedback() {
+    HapticFeedback.lightImpact();
+  }
+
+  /// Redirige vers l'écran de notation une fois la commande DELIVERED.
+  /// Gardé idempotent par `_navigatedToRating` pour éviter les pushes multiples
+  /// si `order:status` et `delivery:status` arrivent tous les deux.
+  void _navigateToRating() {
+    if (_navigatedToRating) return;
+    _navigatedToRating = true;
+    // Léger délai pour laisser l'utilisateur voir le dernier état "Livrée"
+    // avant d'être amené sur l'écran de notation.
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      final router = GoRouter.of(context);
+      router.go('/rating/${widget.orderId}');
+    });
+  }
+
+  /// Miroir exact de la progression utilisée par `OrderProgressTimeline` —
+  /// utilisé pour empêcher la timeline de régresser quand un event `order:status`
+  /// plus ancien arrive après un `delivery:status` plus avancé.
+  int _progressFor(OrderStatus s) {
+    switch (s) {
+      case OrderStatus.delivered:
+        return 7;
+      case OrderStatus.delivering:
+        return 6;
+      case OrderStatus.pickedUp:
+        return 5;
+      case OrderStatus.ready:
+      case OrderStatus.assigned:
+        return 4;
+      case OrderStatus.preparing:
+        return 3;
+      case OrderStatus.confirmed:
+        return 2;
+      case OrderStatus.pending:
+        return 1;
+      case OrderStatus.cancelled:
+        return -1;
+    }
+  }
+
   String? _bannerFor(DeliveryStage s) {
     switch (s) {
       case DeliveryStage.arrivedRestaurant:
@@ -276,7 +443,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
       case DeliveryStage.pickedUp:
         return 'Le livreur a récupéré votre commande, il arrive !';
       case DeliveryStage.arrivedClient:
-        return 'Votre livreur est arrivé !';
+        return 'Votre livreur est arrivé à destination !';
       case DeliveryStage.assigned:
       case DeliveryStage.delivered:
       case DeliveryStage.none:
@@ -287,8 +454,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   bool get _showLiveMap =>
       _stage == DeliveryStage.pickedUp ||
       _stage == DeliveryStage.arrivedClient ||
+      _stage == DeliveryStage.delivered ||
       (_liveStatus == OrderStatus.pickedUp ||
-          _liveStatus == OrderStatus.delivering);
+          _liveStatus == OrderStatus.delivering ||
+          _liveStatus == OrderStatus.delivered);
 
   // ─── Dispose ─────────────────────────────────────────────────────────────
 
@@ -301,6 +470,8 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     socket.off('rider:location');
     socket.off('tracking:update');
     _pollTimer?.cancel();
+    _riderAnim?.removeListener(_onRiderTween);
+    _riderAnim?.dispose();
     super.dispose();
   }
 
@@ -569,28 +740,6 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
       timestamps[6] = order.delivery.deliveredAt;
     }
     return timestamps;
-  }
-
-  int _progressFor(OrderStatus s) {
-    switch (s) {
-      case OrderStatus.delivered:
-        return 7;
-      case OrderStatus.delivering:
-        return 6;
-      case OrderStatus.pickedUp:
-        return 5;
-      case OrderStatus.ready:
-      case OrderStatus.assigned:
-        return 4;
-      case OrderStatus.preparing:
-        return 3;
-      case OrderStatus.confirmed:
-        return 2;
-      case OrderStatus.pending:
-        return 1;
-      case OrderStatus.cancelled:
-        return -1;
-    }
   }
 
   Future<void> _callRider(String? phone) async {
