@@ -1,5 +1,6 @@
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../constants/api_constants.dart';
+import '../storage/secure_storage.dart';
 
 class SocketService {
   io.Socket? _socket;
@@ -21,28 +22,36 @@ class SocketService {
           .build(),
     );
 
-    _socket!.onConnect((_) {
-      assert(() {
-        // ignore: avoid_print
-        print('[Socket] Connected');
-        return true;
-      }());
+    _socket!.onConnect((_) async {
+      // ignore: avoid_print
+      print('[Client] Socket connected, socketId=${_socket?.id}');
+      final userId = await SecureStorage.getUserId();
+      _socket?.emit('join', {
+        'userId': userId,
+        'role': 'CLIENT',
+      });
+      // ignore: avoid_print
+      print('[Client] join emitted for userId=$userId role=CLIENT');
+    });
+
+    _socket!.onAny((event, data) {
+      // ignore: avoid_print
+      print('[Client] Event: $event, data: $data');
     });
 
     _socket!.onDisconnect((_) {
-      assert(() {
-        // ignore: avoid_print
-        print('[Socket] Disconnected');
-        return true;
-      }());
+      // ignore: avoid_print
+      print('[Client] Socket disconnected');
+    });
+
+    _socket!.onConnectError((err) {
+      // ignore: avoid_print
+      print('[Client] Connect error: $err');
     });
 
     _socket!.onError((data) {
-      assert(() {
-        // ignore: avoid_print
-        print('[Socket] Error: $data');
-        return true;
-      }());
+      // ignore: avoid_print
+      print('[Client] Socket error: $data');
     });
   }
 

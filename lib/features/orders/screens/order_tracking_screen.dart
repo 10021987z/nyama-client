@@ -80,8 +80,19 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) ref.invalidate(orderDetailProvider(widget.orderId));
+    // Polling fallback 5s : rafraîchit la commande tant qu'elle n'est pas
+    // DELIVERED ou CANCELLED. Sert de safety net si le socket ne pousse pas
+    // les events `order:status` / `delivery:status` en temps réel.
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      final status = _liveStatus ??
+          ref.read(orderDetailProvider(widget.orderId)).value?.status;
+      if (status == OrderStatus.delivered ||
+          status == OrderStatus.cancelled) {
+        _pollTimer?.cancel();
+        return;
+      }
+      ref.invalidate(orderDetailProvider(widget.orderId));
     });
   }
 
@@ -92,6 +103,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     socket.emit('order:join', {'orderId': widget.orderId});
 
     socket.on('order:status', _onOrderStatus);
+    socket.on('order:assigned', _onOrderAssigned);
     socket.on('delivery:status', _onDeliveryStatus);
     socket.on('rider:location', _onRiderLocation);
     // Back-compat avec la version précédente (tracking:update = rider:location)
@@ -102,6 +114,48 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
     if (!mounted || data is! Map) return;
     final status = OrderStatus.fromString(data['status'] as String?);
     setState(() => _liveStatus = status);
+    ref.invalidate(orderDetailProvider(widget.orderId));
+    // Arrête le polling dès qu'on atteint un état terminal.
+    if (status == OrderStatus.delivered ||
+        status == OrderStatus.cancelled) {
+      _pollTimer?.cancel();
+    }
+  }
+
+  void _onOrderAssigned(dynamic data) {
+    if (!mounted || data is! Map) return;
+
+    final name = data['riderName'] as String? ?? data['name'] as String?;
+    final phone = data['riderPhone'] as String? ?? data['phone'] as String?;
+    final photo = data['riderPhotoUrl'] as String? ??
+        data['photoUrl'] as String? ??
+        data['avatarUrl'] as String?;
+    final vehicleType = data['riderVehicleType'] as String? ??
+        data['vehicleType'] as String?;
+    final vehicleModel = data['riderVehicleModel'] as String? ??
+        data['vehicleModel'] as String?;
+    final plate = data['riderPlate'] as String? ??
+        data['licensePlate'] as String? ??
+        data['plate'] as String?;
+    final rating = (data['riderRating'] as num?)?.toDouble() ??
+        (data['rating'] as num?)?.toDouble();
+
+    final order = ref.read(orderDetailProvider(widget.orderId)).value;
+    final base = _liveRider ?? order?.delivery ?? const DeliveryModel();
+    final hydrated = base.copyWith(
+      riderName: name,
+      riderPhone: phone,
+      riderPhotoUrl: photo,
+      riderVehicleType: vehicleType,
+      riderVehicleModel: vehicleModel,
+      riderPlate: plate,
+      riderRating: rating,
+    );
+
+    setState(() {
+      _liveRider = hydrated;
+      if (_stage == DeliveryStage.none) _stage = DeliveryStage.assigned;
+    });
     ref.invalidate(orderDetailProvider(widget.orderId));
   }
 
@@ -242,6 +296,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> {
   void dispose() {
     final socket = ref.read(socketServiceProvider);
     socket.off('order:status');
+    socket.off('order:assigned');
     socket.off('delivery:status');
     socket.off('rider:location');
     socket.off('tracking:update');
