@@ -399,12 +399,13 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   /// Redirige vers l'écran de notation une fois la commande DELIVERED.
   /// Gardé idempotent par `_navigatedToRating` pour éviter les pushes multiples
   /// si `order:status` et `delivery:status` arrivent tous les deux.
+  ///
+  /// Délai 2000ms : laisse l'utilisateur voir le dernier point "Livrée" allumé
+  /// dans la timeline avant la transition vers /rating/:orderId.
   void _navigateToRating() {
     if (_navigatedToRating) return;
     _navigatedToRating = true;
-    // Léger délai pour laisser l'utilisateur voir le dernier état "Livrée"
-    // avant d'être amené sur l'écran de notation.
-    Future.delayed(const Duration(milliseconds: 900), () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       final router = GoRouter.of(context);
       router.go('/rating/${widget.orderId}');
@@ -528,8 +529,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        // ── Carte live rider (haut) — ~220dp, visible dès PICKED_UP ───
-        if (_showLiveMap) _buildLiveMap(order),
+        // ── Carte live rider (haut) — 50% écran, visible dès PICKED_UP ───
+        // Inclut une bannière ETA (Kevin arrive dans X min · Y km) au-dessus
+        // de la carte OSM pour matcher le pattern Deliveroo.
+        if (_showLiveMap) _buildLiveMap(order, rider),
 
         // ── Bannière statut delivery ─────────────────────────────────
         if (_banner != null)
@@ -572,15 +575,28 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                 ),
               ),
               const SizedBox(height: 6),
-              if (currentStatus != OrderStatus.delivered &&
+              // ETA visible ici uniquement quand la carte live n'est PAS
+              // affichée — sinon l'ETA banner au-dessus de la carte le porte
+              // déjà ("Kevin arrive dans X min · Y km").
+              if (!_showLiveMap &&
+                  currentStatus != OrderStatus.delivered &&
                   currentStatus != OrderStatus.cancelled)
                 Text(
-                  _showLiveMap
-                      ? 'Arrivée dans ~$etaMin min • ${_hm(_eta)}'
-                      : 'Livraison estimée : ${_hm(_eta)}',
+                  'Livraison estimée : ${_hm(_eta)}',
                   style: const TextStyle(
                     fontFamily: 'SpaceMono',
                     fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              else if (_showLiveMap &&
+                  currentStatus != OrderStatus.delivered &&
+                  currentStatus != OrderStatus.cancelled)
+                Text(
+                  'Arrivée prévue à ${_hm(_eta)} (≈ $etaMin min)',
+                  style: const TextStyle(
+                    fontFamily: 'SpaceMono',
+                    fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -614,71 +630,269 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
 
   // ─── Live map ────────────────────────────────────────────────────────────
 
-  Widget _buildLiveMap(OrderModel order) {
+  /// Carte live façon Deliveroo, visible dès `PICKED_UP`.
+  ///   - Hauteur = 50% de la hauteur écran.
+  ///   - Marker rider = photo en cercle (fallback initiales) avec halo pulse.
+  ///   - Marker dest  = pin maison vert.
+  ///   - Polyline orange entre les deux (ligne droite, pas de routing service).
+  ///   - ETA banner au-dessus : "Kevin arrive dans X min · Y km".
+  ///   - Tap sur marker rider → modal nom/note/Appeler Kevin.
+  Widget _buildLiveMap(OrderModel order, DeliveryModel riderInfo) {
     final destLat = order.delivery.lat ?? 4.0511;
     final destLng = order.delivery.lng ?? 9.7679;
     final dest = LatLng(destLat, destLng);
 
-    // Position rider : dernière connue, sinon point d'approche estimé.
-    final rider = _riderPos ??
-        LatLng(destLat + 0.006, destLng + 0.006);
+    // Position rider : dernière connue (interpolée), sinon point d'approche.
+    final rider = _riderPos ?? LatLng(destLat + 0.006, destLng + 0.006);
 
     final mid = LatLng(
       (rider.latitude + dest.latitude) / 2,
       (rider.longitude + dest.longitude) / 2,
     );
 
-    return SizedBox(
-      height: 220,
-      child: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: mid,
-          initialZoom: 14,
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+    final mediaH = MediaQuery.of(context).size.height;
+    // 50% de l'écran, clamped pour rester raisonnable sur petits/grands écrans.
+    final mapH = (mediaH * 0.5).clamp(280.0, 520.0);
+
+    final etaMin = _eta.difference(DateTime.now()).inMinutes.clamp(0, 999);
+    final distKm = _haversineKm(rider, dest);
+    final riderName = (riderInfo.riderName ?? '').isNotEmpty
+        ? riderInfo.riderName!
+        : 'Le livreur';
+
+    return Column(
+      children: [
+        // ── ETA banner ("Kevin arrive dans 8 min · 2.3 km") ────────────
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceWhite,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.cardShadow,
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.directions_bike_rounded,
+                  color: AppColors.primary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$riderName arrive dans $etaMin min · ${distKm.toStringAsFixed(1)} km',
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.charcoal,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.nyama.client',
-            maxZoom: 19,
-          ),
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: [rider, dest],
-                color: AppColors.primary,
-                strokeWidth: 4,
-              ),
-            ],
-          ),
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: dest,
-                width: 44,
-                height: 44,
-                child: const _MapPin(
-                  color: AppColors.forestGreen,
-                  icon: Icons.home_rounded,
+        // ── Carte OSM ───────────────────────────────────────────────────
+        SizedBox(
+          height: mapH,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(20),
+            ),
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: mid,
+                initialZoom: 14,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
                 ),
               ),
-              Marker(
-                point: rider,
-                width: 48,
-                height: 48,
-                child: const _MapPin(
-                  color: AppColors.primary,
-                  icon: Icons.delivery_dining_rounded,
-                  pulse: true,
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.nyama.client',
+                  maxZoom: 19,
                 ),
-              ),
-            ],
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: [rider, dest],
+                      color: AppColors.primary,
+                      strokeWidth: 4,
+                    ),
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: dest,
+                      width: 44,
+                      height: 44,
+                      child: const _MapPin(
+                        color: AppColors.forestGreen,
+                        icon: Icons.home_rounded,
+                      ),
+                    ),
+                    Marker(
+                      point: rider,
+                      width: 64,
+                      height: 64,
+                      child: GestureDetector(
+                        onTap: () => _showRiderTapModal(riderInfo),
+                        child: _RiderPhotoPin(
+                          name: riderName,
+                          photoUrl: riderInfo.riderPhotoUrl,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  /// Bottom-sheet déclenché au tap du marker rider.
+  /// Affiche photo + nom + note moyenne + bouton "Appeler {nom}" (tel:…).
+  void _showRiderTapModal(DeliveryModel rider) {
+    HapticFeedback.selectionClick();
+    final name = (rider.riderName ?? '').isNotEmpty
+        ? rider.riderName!
+        : 'Le livreur';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'L';
+    final rating = rider.riderRating;
+    final phone = rider.riderPhone;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.outlineVariant.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CircleAvatar(
+                  radius: 36,
+                  backgroundColor: AppColors.primaryLight,
+                  backgroundImage: (rider.riderPhotoUrl ?? '').isNotEmpty
+                      ? NetworkImage(rider.riderPhotoUrl!)
+                      : null,
+                  child: (rider.riderPhotoUrl ?? '').isEmpty
+                      ? Text(
+                          initial,
+                          style: const TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.star_rounded,
+                        size: 18, color: AppColors.gold),
+                    const SizedBox(width: 4),
+                    Text(
+                      rating != null ? rating.toStringAsFixed(1) : '5.0',
+                      style: const TextStyle(
+                        fontFamily: 'SpaceMono',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.charcoal,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'note moyenne',
+                      style: TextStyle(
+                        fontFamily: 'NunitoSans',
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      await _callRider(phone);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.forestGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.phone_rounded, size: 20),
+                    label: Text(
+                      'Appeler $name',
+                      style: const TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text(
+                    'Fermer',
+                    style: TextStyle(
+                      fontFamily: 'NunitoSans',
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -890,6 +1104,117 @@ class _MapPinState extends State<_MapPin> with SingleTickerProviderStateMixin {
               ),
             ),
             dot,
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ─── Rider photo pin (carte) ────────────────────────────────────────────────
+
+/// Marker carte avec photo du livreur (ou initiales fallback) en cercle, halo
+/// pulse orange autour. Apparait dès que le rider a son `riderPhotoUrl`.
+class _RiderPhotoPin extends StatefulWidget {
+  final String name;
+  final String? photoUrl;
+
+  const _RiderPhotoPin({required this.name, this.photoUrl});
+
+  @override
+  State<_RiderPhotoPin> createState() => _RiderPhotoPinState();
+}
+
+class _RiderPhotoPinState extends State<_RiderPhotoPin>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = widget.name.isNotEmpty ? widget.name[0].toUpperCase() : 'L';
+    final hasPhoto = (widget.photoUrl ?? '').isNotEmpty;
+
+    final avatar = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary, width: 3),
+        color: AppColors.surfaceWhite,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: hasPhoto
+            ? Image.network(
+                widget.photoUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.primaryLight,
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              )
+            : Container(
+                color: AppColors.primaryLight,
+                alignment: Alignment.center,
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+      ),
+    );
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final v = _ctrl.value;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 44 + v * 20,
+              height: 44 + v * 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.25 * (1 - v)),
+              ),
+            ),
+            avatar,
           ],
         );
       },

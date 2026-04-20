@@ -121,4 +121,38 @@ class OrdersRepository {
 
     await _client.post(ApiConstants.reviews, data: body);
   }
+
+  /// Notation simplifiée post-livraison rider (LOT 2 — UI Deliveroo-like).
+  ///
+  /// Endpoint : POST /orders/:id/rating { stars, comment, tags }.
+  /// Si l'API ne supporte pas (404 / 405), on retombe sur l'ancien
+  /// `/reviews` avec mapping `riderRating = stars`.
+  Future<void> submitRating({
+    required String orderId,
+    required int stars,
+    String? comment,
+    List<String> tags = const [],
+  }) async {
+    final body = <String, dynamic>{
+      'stars': stars,
+      if (comment != null && comment.isNotEmpty) 'comment': comment,
+      if (tags.isNotEmpty) 'tags': tags,
+    };
+    try {
+      await _client.post(ApiConstants.orderRating(orderId), data: body);
+    } catch (_) {
+      // Fallback /reviews (back-compat avec l'ancien backend) — concatène
+      // les tags dans le commentaire pour ne rien perdre côté analytics.
+      final mergedComment = [
+        if (comment != null && comment.isNotEmpty) comment,
+        if (tags.isNotEmpty) tags.join(', '),
+      ].join(' — ');
+      await createReview(
+        orderId: orderId,
+        cookRating: stars.toDouble(),
+        riderRating: stars.toDouble(),
+        riderComment: mergedComment.isEmpty ? null : mergedComment,
+      );
+    }
+  }
 }
