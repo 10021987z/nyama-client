@@ -608,6 +608,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
 
+    // ignore: avoid_print
+    print('[Checkout] _method=$_method isCash=$_isCash isMomo=$_isMomo');
+
     if (_isMomo) {
       final biometricEnabled = await SecureStorage.getBiometricEnabled();
       if (biometricEnabled) {
@@ -629,17 +632,46 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
     setState(() => _processing = true);
 
+    // ─── Étape 1 : création de la commande (pour CASH ET MoMo) ──────────
+    final String orderId;
     try {
-      final orderId = await _createOrderOrFallback(checkout);
+      // ignore: avoid_print
+      print('[Checkout] Creating order with paymentMethod=$_method');
+      orderId = await _createOrderOrFallback(checkout);
+      // ignore: avoid_print
+      print('[Checkout] Order created: id=$orderId');
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Checkout] Order creation failed: $e');
+      if (!mounted) return;
+      setState(() => _processing = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.errorRed,
+          content: Text(
+            'Impossible de créer la commande. Réessayez.',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+      return;
+    }
 
-      if (_isCash) {
-        if (!mounted) return;
-        ref.read(cartProvider.notifier).clearCart();
-        setState(() => _processing = false);
-        router.go('/orders/$orderId/track');
-        return;
-      }
+    // ─── Étape 2a : CASH → skip NotchPay, navigate direct to tracking ──
+    if (_isCash) {
+      // ignore: avoid_print
+      print('[Checkout] CASH path: skipping NotchPay, go to /orders/$orderId/track');
+      if (!mounted) return;
+      ref.read(cartProvider.notifier).clearCart();
+      setState(() => _processing = false);
+      router.go('/orders/$orderId/track');
+      return;
+    }
 
+    // ─── Étape 2b : MoMo → initier NotchPay + WebView ──────────────────
+    // ignore: avoid_print
+    print('[Checkout] MoMo path: initiating NotchPay for order=$orderId');
+    try {
       final notchPayMethod = PaymentService.normalizeMethod(_method);
       final init = await PaymentService.initiatePayment(
         orderId: orderId,
@@ -701,7 +733,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           );
           break;
       }
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Checkout] NotchPay initiate failed: $e');
       if (!mounted) return;
       setState(() => _processing = false);
       messenger.showSnackBar(
