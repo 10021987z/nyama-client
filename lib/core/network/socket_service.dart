@@ -10,14 +10,17 @@ class SocketService {
   void connect(String accessToken) {
     if (_socket != null && _socket!.connected) return;
 
+    // ignore: avoid_print
+    print('[Client] 🔌 Connecting to ${ApiConstants.wsUrl}');
     _socket = io.io(
       ApiConstants.wsUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .setAuth({'token': accessToken})
-          .enableAutoConnect()
+          .setExtraHeaders({'Authorization': 'Bearer $accessToken'})
+          .disableAutoConnect()
           .enableReconnection()
-          .setReconnectionAttempts(5)
+          .setReconnectionAttempts(999)
           .setReconnectionDelay(2000)
           .build(),
     );
@@ -53,6 +56,8 @@ class SocketService {
       // ignore: avoid_print
       print('[Client] Socket error: $data');
     });
+
+    _socket!.connect();
   }
 
   void disconnect() {
