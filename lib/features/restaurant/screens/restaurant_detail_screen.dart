@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/network/socket_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../../../shared/widgets/error_widget.dart';
@@ -13,14 +16,85 @@ import '../../home/data/models/menu_item.dart';
 import '../../home/providers/home_provider.dart';
 import 'product_bottom_sheet.dart';
 
-class RestaurantDetailScreen extends ConsumerWidget {
+/// Écran détail d'un restaurant avec sync menu temps-réel :
+///  - abonnement socket `menu:updated` filtré sur ce cookId
+///  - fallback polling 30s tant que l'écran est actif
+///  - dispose propre du listener et du timer
+class RestaurantDetailScreen extends ConsumerStatefulWidget {
   final String restaurantId;
 
   const RestaurantDetailScreen({super.key, required this.restaurantId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cookAsync = ref.watch(cookDetailProvider(restaurantId));
+  ConsumerState<RestaurantDetailScreen> createState() =>
+      _RestaurantDetailScreenState();
+}
+
+class _RestaurantDetailScreenState
+    extends ConsumerState<RestaurantDetailScreen> {
+  Timer? _pollTimer;
+  bool _socketHookInstalled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _installSocketListener();
+      _startPolling();
+    });
+  }
+
+  void _installSocketListener() {
+    if (_socketHookInstalled) return;
+    final socket = ref.read(socketServiceProvider);
+    socket.on('menu:updated', _onMenuUpdated);
+    _socketHookInstalled = true;
+  }
+
+  void _onMenuUpdated(dynamic data) {
+    // payload attendu: { cookId, action, menuItem }
+    try {
+      if (data is Map) {
+        final cookId = data['cookId']?.toString();
+        if (cookId == null || cookId == widget.restaurantId) {
+          _refreshMenu(reason: 'socket');
+        }
+      } else {
+        _refreshMenu(reason: 'socket-any');
+      }
+    } catch (_) {
+      _refreshMenu(reason: 'socket-error-fallback');
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _refreshMenu(reason: 'poll');
+    });
+  }
+
+  void _refreshMenu({required String reason}) {
+    if (!mounted) return;
+    // ignore: avoid_print
+    print(
+        '[RestaurantDetail] refresh menu (reason=$reason, cookId=${widget.restaurantId})');
+    ref.invalidate(cookDetailProvider(widget.restaurantId));
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    try {
+      ref.read(socketServiceProvider).off('menu:updated');
+    } catch (_) {}
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cookAsync = ref.watch(cookDetailProvider(widget.restaurantId));
     final cart = ref.watch(cartProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
 
@@ -31,7 +105,8 @@ class RestaurantDetailScreen extends ConsumerWidget {
           appBar: AppBar(title: const Text('Restaurant')),
           body: NyamaErrorWidget(
             message: e.toString(),
-            onRetry: () => ref.invalidate(cookDetailProvider(restaurantId)),
+            onRetry: () =>
+                ref.invalidate(cookDetailProvider(widget.restaurantId)),
           ),
         ),
         data: (cook) => _RestaurantBody(

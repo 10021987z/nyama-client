@@ -193,6 +193,10 @@ class _LogInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) {
     // ignore: avoid_print
     print('[API ERROR] ${err.type} ${err.response?.statusCode} ${err.requestOptions.path}: ${err.message}');
-    handler.next(ApiExceptionHandler.handle(err) as DioException? ?? err);
+    // Convertit l'erreur Dio en ApiException custom et la ré-émet à travers
+    // l'interceptor Dio via `copyWith(error: ...)` — PAS de cast brut, sinon
+    // "ApiException is not a subtype of DioException in type cast".
+    final apiEx = ApiExceptionHandler.handle(err);
+    handler.next(err.copyWith(error: apiEx));
   }
 }
