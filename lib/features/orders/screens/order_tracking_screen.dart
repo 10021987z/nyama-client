@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -9,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/network/socket_provider.dart';
 import '../../../core/utils/fcfa_formatter.dart';
 import '../data/models/order_models.dart';
@@ -65,7 +67,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   DeliveryStage _stage = DeliveryStage.none;
   String? _banner;
   Timer? _pollTimer;
-  bool _navigatedToRating = false;
+  // Flag de garde pour la navigation vers /rating/:id — évite les multiples
+  // pushes si `order:status` et `delivery:status` arrivent tous les deux avec
+  // un état DELIVERED (le Timer 2s ne doit se planifier qu'UNE fois).
+  bool _navScheduled = false;
 
   // Live rider tracking
   LatLng? _riderPos;
@@ -73,6 +78,8 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   LatLng? _riderPrevPos;
   AnimationController? _riderAnim;
   DeliveryModel? _liveRider;
+  String? _riderId;
+  bool _didHttpLocationFallback = false;
   final MapController _mapController = MapController();
 
   // ETA calculation — mis à jour dès qu'on a la position du rider.
@@ -86,7 +93,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     super.initState();
     _riderAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 500),
     )..addListener(_onRiderTween);
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupSocket());
     // Polling fallback 5s : rafraîchit la commande tant qu'elle n'est pas
@@ -188,6 +195,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
       if (_stage == DeliveryStage.none) _stage = DeliveryStage.assigned;
     });
     ref.invalidate(orderDetailProvider(widget.orderId));
+    // Dès l'assignation du livreur, on essaie une fois le HTTP fallback
+    // `GET /rider/:id/location` pour afficher un premier point sur la carte
+    // avant même le premier `rider:location` du socket.
+    _tryHttpRiderLocation();
   }
 
   void _onDeliveryStatus(dynamic data) {
@@ -269,6 +280,14 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
           (b == null ? null : lookup(riderObj, b)) ??
           (c == null ? null : lookup(riderObj, c));
       return v?.toString();
+    }
+
+    // Capture l'id du rider dès qu'on le voit passer — utile pour le
+    // fallback HTTP `GET /rider/:id/location` si le socket ne pousse jamais
+    // de `rider:location` (tentative unique, voir _tryHttpRiderLocation).
+    final riderIdFromPayload = read('riderId', 'id') ?? read('driverId');
+    if (riderIdFromPayload != null && riderIdFromPayload.isNotEmpty) {
+      _riderId = riderIdFromPayload;
     }
 
     final name = read('riderName', 'name');
@@ -397,19 +416,51 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   }
 
   /// Redirige vers l'écran de notation une fois la commande DELIVERED.
-  /// Gardé idempotent par `_navigatedToRating` pour éviter les pushes multiples
-  /// si `order:status` et `delivery:status` arrivent tous les deux.
+  /// Gardé idempotent par `_navScheduled` pour éviter les pushes multiples
+  /// si `order:status` et `delivery:status` arrivent tous les deux avec
+  /// un état DELIVERED.
   ///
-  /// Délai 2000ms : laisse l'utilisateur voir le dernier point "Livrée" allumé
+  /// Délai 2s : laisse l'utilisateur voir le dernier point "Livrée" allumé
   /// dans la timeline avant la transition vers /rating/:orderId.
   void _navigateToRating() {
-    if (_navigatedToRating) return;
-    _navigatedToRating = true;
-    Future.delayed(const Duration(seconds: 2), () {
+    if (_navScheduled) return;
+    _navScheduled = true;
+    Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
-      final router = GoRouter.of(context);
-      router.go('/rating/${widget.orderId}');
+      // `go_router` est utilisé dans /Users/opiumdigital/nyama_client/lib/app.dart
+      // — route `/rating/:orderId` déjà déclarée.
+      context.go('/rating/${widget.orderId}');
     });
+  }
+
+  /// Tentative unique d'appel HTTP `GET /rider/:id/location` en fallback
+  /// quand le socket n'envoie pas encore de `rider:location`. Accepte les
+  /// payloads { lat, lng } ou { location: { lat, lng } }. Si l'endpoint
+  /// n'existe pas (404) ou échoue, on ignore silencieusement et on garde
+  /// la dernière position connue dans le state (`_riderPos`).
+  Future<void> _tryHttpRiderLocation() async {
+    if (_didHttpLocationFallback) return;
+    if (_riderPos != null) return;
+    final id = _riderId;
+    if (id == null || id.isEmpty) return;
+    _didHttpLocationFallback = true;
+    try {
+      final resp = await ApiClient.instance.get<dynamic>('/rider/$id/location');
+      final data = resp.data;
+      if (data is Map) {
+        final Map loc = data['location'] is Map
+            ? data['location'] as Map
+            : data;
+        final lat = (loc['lat'] as num?)?.toDouble();
+        final lng = (loc['lng'] as num?)?.toDouble();
+        if (lat != null && lng != null && mounted) {
+          _updateRiderPos(LatLng(lat, lng));
+        }
+      }
+    } catch (_) {
+      // 404 / endpoint absent — fallback silencieux sur la dernière position
+      // connue (peut rester `null` tant qu'aucun `rider:location` n'arrive).
+    }
   }
 
   /// Miroir exact de la progression utilisée par `OrderProgressTimeline` —
@@ -452,11 +503,19 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     }
   }
 
+  /// Affiche la carte live dès qu'un livreur est assigné.
+  /// Spec Client : `delivery.status ∈ {ASSIGNED, PICKED_UP, EN_ROUTE}` → carte
+  /// visible. On couvre aussi les états plus avancés (ARRIVED_CLIENT) et les
+  /// états dérivés d'`order:status` (assigned/pickedUp/delivering/delivered)
+  /// au cas où le backend ne pousserait que `order:status`.
   bool get _showLiveMap =>
+      _stage == DeliveryStage.assigned ||
+      _stage == DeliveryStage.arrivedRestaurant ||
       _stage == DeliveryStage.pickedUp ||
       _stage == DeliveryStage.arrivedClient ||
       _stage == DeliveryStage.delivered ||
-      (_liveStatus == OrderStatus.pickedUp ||
+      (_liveStatus == OrderStatus.assigned ||
+          _liveStatus == OrderStatus.pickedUp ||
           _liveStatus == OrderStatus.delivering ||
           _liveStatus == OrderStatus.delivered);
 
@@ -650,9 +709,11 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
       (rider.longitude + dest.longitude) / 2,
     );
 
+    // Hauteur carte : ~280px (spec Client). On laisse une petite marge sur les
+    // très grands écrans pour que la carte reste ergonomique sans dominer la
+    // vue (la timeline + card rider doivent rester visibles sans scroll excessif).
     final mediaH = MediaQuery.of(context).size.height;
-    // 50% de l'écran, clamped pour rester raisonnable sur petits/grands écrans.
-    final mapH = (mediaH * 0.5).clamp(280.0, 520.0);
+    final mapH = mediaH < 700 ? 260.0 : 280.0;
 
     final etaMin = _eta.difference(DateTime.now()).inMinutes.clamp(0, 999);
     final distKm = _haversineKm(rider, dest);
@@ -1166,10 +1227,23 @@ class _RiderPhotoPinState extends State<_RiderPhotoPin>
       ),
       child: ClipOval(
         child: hasPhoto
-            ? Image.network(
-                widget.photoUrl!,
+            ? CachedNetworkImage(
+                imageUrl: widget.photoUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                placeholder: (_, __) => Container(
+                  color: AppColors.primaryLight,
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
                   color: AppColors.primaryLight,
                   alignment: Alignment.center,
                   child: Text(

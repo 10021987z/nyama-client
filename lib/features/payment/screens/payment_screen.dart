@@ -27,8 +27,9 @@ class PaymentScreen extends ConsumerStatefulWidget {
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _method = 'mtn_momo';
   late final TextEditingController _phoneCtrl;
+  final TextEditingController _addressCtrl = TextEditingController();
+  final GlobalKey<FormState> _addressFormKey = GlobalKey<FormState>();
   bool _processing = false;
-  String _address = '';
 
   @override
   void initState() {
@@ -44,17 +45,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final city = await SecureStorage.getCity();
     final quartier = await SecureStorage.getQuartier();
     if (!mounted) return;
-    setState(() {
-      _address = [quartier, city]
-          .where((s) => s != null && s.isNotEmpty)
-          .join(', ');
-      if (_address.isEmpty) _address = 'Bonapriso, Douala';
-    });
+    var prefill = [quartier, city]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(', ');
+    if (prefill.isEmpty) prefill = 'Bonapriso, Douala';
+    // On ne remplace PAS ce que l'utilisateur a tapé manuellement ;
+    // on pré-remplit seulement si le champ est vide ou contient la valeur
+    // par défaut issue d'un précédent chargement.
+    if (_addressCtrl.text.trim().isEmpty) {
+      _addressCtrl.text = prefill;
+    }
   }
 
   @override
   void dispose() {
     _phoneCtrl.dispose();
+    _addressCtrl.dispose();
     super.dispose();
   }
 
@@ -292,59 +298,139 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.location_on_rounded,
-                color: AppColors.primary, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          // En-tête : icône + label
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.location_on_rounded,
+                    color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
                   t('delivery_address', ref),
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _address,
-                  style: const TextStyle(
-                    fontFamily: AppTheme.bodyFamily,
+                    fontFamily: AppTheme.headlineFamily,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.charcoal,
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Saisie libre (obligatoire) ───────────────────────────────────
+          Form(
+            key: _addressFormKey,
+            child: TextFormField(
+              controller: _addressCtrl,
+              minLines: 1,
+              maxLines: 2,
+              textInputAction: TextInputAction.newline,
+              style: const TextStyle(
+                fontFamily: AppTheme.bodyFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.charcoal,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Adresse de livraison',
+                hintText:
+                    'Taper librement ou utiliser la recherche Google ci-dessous',
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textTertiary,
+                ),
+                filled: true,
+                fillColor: AppColors.surfaceLow,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+              ),
+              validator: (value) =>
+                  (value == null || value.trim().length < 10)
+                      ? 'Minimum 10 caractères'
+                      : null,
             ),
           ),
-          TextButton(
-            onPressed: () => context.push('/onboarding/quartier'),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(40, 32),
-            ),
-            child: Text(
-              t('modify', ref),
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.outlineVariant),
+          const SizedBox(height: 12),
+
+          // ── Complément : recherche Google Places (autocomplete carte) ───
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Ou sélectionner sur la carte :',
+                  style: TextStyle(
+                    fontFamily: AppTheme.bodyFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
-            ),
+              TextButton.icon(
+                onPressed: () async {
+                  await context.push('/onboarding/quartier');
+                  // Au retour, on re-pré-remplit le champ SI l'utilisateur
+                  // n'a pas déjà tapé un texte personnalisé différent du
+                  // pré-remplissage précédent.
+                  if (!mounted) return;
+                  final city = await SecureStorage.getCity();
+                  final quartier = await SecureStorage.getQuartier();
+                  if (!mounted) return;
+                  final fresh = [quartier, city]
+                      .where((s) => s != null && s.isNotEmpty)
+                      .join(', ');
+                  if (fresh.isNotEmpty) {
+                    setState(() => _addressCtrl.text = fresh);
+                  }
+                },
+                icon: const Icon(Icons.map_rounded,
+                    color: AppColors.primary, size: 18),
+                label: Text(
+                  t('modify', ref),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(40, 32),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -598,6 +684,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       );
 
   Future<void> _onPay(CheckoutData checkout) async {
+    // Validation de l'adresse de livraison (saisie libre).
+    if (!(_addressFormKey.currentState?.validate() ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Adresse de livraison invalide (minimum 10 caractères).'),
+        ),
+      );
+      return;
+    }
+
     if (_isMomo && _phoneCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t('enter_number', ref))),
@@ -761,9 +858,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     'quantity': i.quantity,
                   })
               .toList(),
-          deliveryAddress: _address,
+          deliveryAddress: _addressCtrl.text.trim(),
           paymentMethod: _method,
           paymentPhone: _isMomo ? _phoneCtrl.text.trim() : null,
+          // lat/lng nullable : si l'utilisateur tape librement sans passer
+          // par la carte, le backend recevra les défauts Douala centre
+          // définis côté CreateOrderRequest.toJson().
         ),
       );
       return order.id;

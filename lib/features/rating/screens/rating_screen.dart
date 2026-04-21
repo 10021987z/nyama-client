@@ -8,18 +8,15 @@ import '../../orders/providers/orders_provider.dart';
 
 /// Écran 1.8 — Notation post-livraison NYAMA.
 ///
-/// Cet écran est ouvert automatiquement 2s après l'event DELIVERED par
-/// `OrderTrackingScreen._navigateToRating()`.
+/// 3 sections OBLIGATOIRES (bouton « Envoyer » désactivé tant que les 3 étoiles
+/// ne sont pas remplies) :
+///   1. Note livreur     : `${riderName}`      + tags rapides multi-sélection
+///   2. Note plat        : `${restaurantName}` (nom cuisinière / restaurant)
+///   3. Note app NYAMA
 ///
-/// Spec :
-///   - Titre : « Merci ! Votre commande est arrivée »
-///   - Avatar livreur + nom (depuis `order.delivery.riderName`)
-///   - 5 étoiles cliquables — REQUIS pour activer le bouton Envoyer
-///   - Zone de texte optionnelle « Laisser un commentaire »
-///   - 3 bulles tags rapides : Rapide / Sympathique / Professionnel
-///   - Bouton « Envoyer » → POST /orders/:id/rating { stars, comment, tags }
-///     → bref écran de remerciement → retour /home
-///   - Bouton « Passer » en petit en bas
+/// + Commentaire optionnel (maxLines 3, maxLength 300).
+/// + Bouton unique « Envoyer » → POST /orders/:id/rating.
+/// + Après succès : écran de remerciement 2s puis `context.go('/home')`.
 class RatingScreen extends ConsumerStatefulWidget {
   final String orderId;
   const RatingScreen({super.key, required this.orderId});
@@ -29,20 +26,16 @@ class RatingScreen extends ConsumerStatefulWidget {
 }
 
 class _RatingScreenState extends ConsumerState<RatingScreen> {
-  static const List<String> _ratingLabels = [
-    'Décevant',
-    'Bof',
-    'Bien',
-    'Très bien',
-    'Parfait !',
-  ];
   static const List<String> _quickTags = [
     'Rapide',
     'Sympathique',
     'Professionnel',
+    'Ponctuel',
   ];
 
-  int _stars = 0;
+  int _riderStars = 0;
+  int _restaurantStars = 0;
+  int _appStars = 0;
   final Set<String> _selectedTags = {};
   final TextEditingController _commentCtrl = TextEditingController();
   bool _submitting = false;
@@ -65,6 +58,12 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     super.dispose();
   }
 
+  bool get _canSubmit =>
+      _riderStars > 0 &&
+      _restaurantStars > 0 &&
+      _appStars > 0 &&
+      !_submitting;
+
   void _toggleTag(String tag) {
     setState(() {
       if (_selectedTags.contains(tag)) {
@@ -76,17 +75,14 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
   }
 
   Future<void> _submit() async {
-    if (_stars == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Merci de noter votre livreur.')),
-      );
-      return;
-    }
+    if (!_canSubmit) return;
     setState(() => _submitting = true);
     try {
       await OrdersRepository().submitRating(
         orderId: widget.orderId,
-        stars: _stars,
+        riderStars: _riderStars,
+        restaurantStars: _restaurantStars,
+        appStars: _appStars,
         comment: _commentCtrl.text.trim().isEmpty
             ? null
             : _commentCtrl.text.trim(),
@@ -97,18 +93,16 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : ${e.toString()}')),
+        SnackBar(
+          content: Text('Erreur : ${e.toString()}'),
+          backgroundColor: AppColors.errorRed,
+        ),
       );
       setState(() => _submitting = false);
     }
   }
 
-  void _skip() {
-    if (!mounted) return;
-    context.go('/home');
-  }
-
-  /// Affiche un dialog "Merci !" non bloquant pendant 1.5s puis retour /home.
+  /// Écran de remerciement non bloquant pendant 2s puis retour `/`.
   /// Idempotent : un re-appel ne déclenche pas un second dialog.
   void _showThanksAndGoHome() {
     if (_thanksShown) return;
@@ -133,17 +127,18 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
                   size: 56, color: AppColors.primary),
               SizedBox(height: 12),
               Text(
-                'Merci pour votre avis !',
+                'Merci !',
                 style: TextStyle(
                   fontFamily: 'Montserrat',
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: AppColors.charcoal,
                 ),
               ),
               SizedBox(height: 6),
               Text(
-                'À très bientôt sur NYAMA.',
+                'Vos avis aident NYAMA.',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'NunitoSans',
                   fontSize: 14,
@@ -155,7 +150,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
         ),
       ),
     );
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop();
       context.go('/home');
@@ -164,14 +159,15 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Hydrate le rider depuis le détail commande pour afficher nom + photo.
+    // Hydrate depuis le détail commande → rider + cuisinière.
     final asyncOrder = ref.watch(orderDetailProvider(widget.orderId));
-    final rider = asyncOrder.value?.delivery;
-    final riderName =
-        (rider?.riderName ?? '').isNotEmpty ? rider!.riderName! : 'Kevin';
-    final riderPhoto = rider?.riderPhotoUrl;
-    final initial =
-        riderName.isNotEmpty ? riderName[0].toUpperCase() : 'K';
+    final order = asyncOrder.value;
+    final rider = order?.delivery;
+    final riderName = (rider?.riderName ?? '').isNotEmpty
+        ? rider!.riderName!
+        : 'Votre livreur';
+    final restaurantName =
+        (order?.cookName ?? '').isNotEmpty ? order!.cookName : 'Votre plat';
 
     return Scaffold(
       backgroundColor: AppColors.creme,
@@ -181,13 +177,13 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
             _buildHeader(),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     const Text(
-                      'Merci ! Votre commande est arrivée',
+                      'Votre commande est arrivée',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Montserrat',
@@ -197,28 +193,71 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
                         height: 1.25,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Comment s\'est passée la livraison avec $riderName ?',
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Dites-nous ce que vous en avez pensé.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'NunitoSans',
                         fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _buildRiderHeader(riderName, riderPhoto, initial),
-                    const SizedBox(height: 24),
-                    _buildStars(),
-                    const SizedBox(height: 22),
-                    _buildQuickTags(),
-                    const SizedBox(height: 24),
+
+                    // ── 1. Note livreur ─────────────────────────────────
+                    _SectionCard(
+                      title: 'Votre livreur',
+                      subtitle: riderName,
+                      child: Column(
+                        children: [
+                          _StarsRow(
+                            keyPrefix: 'rider',
+                            value: _riderStars,
+                            onChanged: (v) =>
+                                setState(() => _riderStars = v),
+                          ),
+                          const SizedBox(height: 14),
+                          _TagsRow(
+                            tags: _quickTags,
+                            selected: _selectedTags,
+                            onToggle: _toggleTag,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── 2. Note plat / cuisinière ───────────────────────
+                    _SectionCard(
+                      title: 'Le plat',
+                      subtitle: restaurantName,
+                      child: _StarsRow(
+                        keyPrefix: 'restaurant',
+                        value: _restaurantStars,
+                        onChanged: (v) =>
+                            setState(() => _restaurantStars = v),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── 3. Note app NYAMA ───────────────────────────────
+                    _SectionCard(
+                      title: 'L’application',
+                      subtitle: 'NYAMA',
+                      child: _StarsRow(
+                        keyPrefix: 'app',
+                        value: _appStars,
+                        onChanged: (v) => setState(() => _appStars = v),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
                     _buildCommentBox(),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 24),
+
                     _buildSendButton(),
-                    const SizedBox(height: 8),
-                    _buildSkipButton(),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -237,7 +276,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
           IconButton(
             key: const Key('rating_close_button'),
             icon: const Icon(Icons.close, color: AppColors.charcoal),
-            onPressed: _skip,
+            onPressed: () => context.go('/home'),
           ),
           const Expanded(
             child: Center(
@@ -259,142 +298,11 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     );
   }
 
-  Widget _buildRiderHeader(String name, String? photoUrl, String initial) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.primary, width: 2.5),
-          ),
-          child: CircleAvatar(
-            radius: 38,
-            backgroundColor: AppColors.primaryLight,
-            backgroundImage: (photoUrl ?? '').isNotEmpty
-                ? NetworkImage(photoUrl!)
-                : null,
-            child: (photoUrl ?? '').isEmpty
-                ? Text(
-                    initial,
-                    style: const TextStyle(
-                      fontFamily: 'Montserrat',
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                    ),
-                  )
-                : null,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          name,
-          style: const TextStyle(
-            fontFamily: 'Montserrat',
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.charcoal,
-          ),
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'Votre livreur',
-          style: TextStyle(
-            fontFamily: 'NunitoSans',
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStars() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(5, (i) {
-            final filled = i < _stars;
-            return GestureDetector(
-              key: Key('rider_star_$i'),
-              onTap: () => setState(() => _stars = i + 1),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(
-                  filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                  size: 44,
-                  color: AppColors.gold,
-                ),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 18,
-          child: _stars > 0
-              ? Text(
-                  _ratingLabels[_stars - 1],
-                  style: const TextStyle(
-                    fontFamily: 'Montserrat',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickTags() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      alignment: WrapAlignment.center,
-      children: _quickTags.map((t) {
-        final active = _selectedTags.contains(t);
-        return GestureDetector(
-          key: Key('tag_${t.toLowerCase()}'),
-          onTap: () => _toggleTag(t),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-            decoration: BoxDecoration(
-              color: active
-                  ? AppColors.primary.withValues(alpha: 0.12)
-                  : AppColors.surfaceWhite,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: active
-                    ? AppColors.primary
-                    : AppColors.outlineVariant.withValues(alpha: 0.5),
-                width: active ? 1.5 : 1,
-              ),
-            ),
-            child: Text(
-              t,
-              style: TextStyle(
-                fontFamily: 'Montserrat',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: active ? AppColors.primary : AppColors.charcoal,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   Widget _buildCommentBox() {
     return TextField(
       controller: _commentCtrl,
       maxLines: 3,
+      maxLength: 300,
       style: const TextStyle(fontFamily: 'NunitoSans', fontSize: 14),
       decoration: InputDecoration(
         hintText: 'Laisser un commentaire (optionnel)',
@@ -430,18 +338,17 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
   }
 
   Widget _buildSendButton() {
-    final enabled = _stars > 0 && !_submitting;
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
         key: const Key('rating_submit_button'),
-        onPressed: enabled ? _submit : null,
+        onPressed: _canSubmit ? _submit : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.forestGreen,
           foregroundColor: Colors.white,
           disabledBackgroundColor:
-              AppColors.forestGreen.withValues(alpha: 0.4),
+              AppColors.forestGreen.withValues(alpha: 0.35),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -466,19 +373,148 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
       ),
     );
   }
+}
 
-  Widget _buildSkipButton() {
-    return TextButton(
-      key: const Key('rating_skip_button'),
-      onPressed: _skip,
-      child: const Text(
-        'Passer',
-        style: TextStyle(
-          fontFamily: 'NunitoSans',
-          fontSize: 13,
-          color: AppColors.textSecondary,
+// ─── Sub-widgets ────────────────────────────────────────────────────────────
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.35),
+          width: 1,
         ),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'NunitoSans',
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Montserrat',
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.charcoal,
+            ),
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _StarsRow extends StatelessWidget {
+  final String keyPrefix;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _StarsRow({
+    required this.keyPrefix,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (i) {
+        final filled = i < value;
+        return GestureDetector(
+          key: Key('${keyPrefix}_star_$i'),
+          onTap: () => onChanged(i + 1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Icon(
+              filled ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: 38,
+              color: AppColors.gold,
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _TagsRow extends StatelessWidget {
+  final List<String> tags;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+
+  const _TagsRow({
+    required this.tags,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: tags.map((t) {
+        final active = selected.contains(t);
+        return GestureDetector(
+          key: Key('tag_${t.toLowerCase()}'),
+          onTap: () => onToggle(t),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.surfaceLow,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: active
+                    ? AppColors.primary
+                    : AppColors.outlineVariant.withValues(alpha: 0.4),
+                width: active ? 1.5 : 1,
+              ),
+            ),
+            child: Text(
+              t,
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: active ? AppColors.primary : AppColors.charcoal,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

@@ -122,36 +122,43 @@ class OrdersRepository {
     await _client.post(ApiConstants.reviews, data: body);
   }
 
-  /// Notation simplifiée post-livraison rider (LOT 2 — UI Deliveroo-like).
+  /// Notation post-livraison (3 notes obligatoires + tags + commentaire).
   ///
-  /// Endpoint : POST /orders/:id/rating { stars, comment, tags }.
-  /// Si l'API ne supporte pas (404 / 405), on retombe sur l'ancien
-  /// `/reviews` avec mapping `riderRating = stars`.
+  /// Endpoint : POST /orders/:id/rating
+  /// Body : { riderStars, restaurantStars, appStars, comment?, tags? }
+  ///
+  /// Fallback : si l'API renvoie 404/405 (ancien backend), on retombe sur
+  /// POST /reviews avec cookRating=restaurantStars et riderRating=riderStars.
   Future<void> submitRating({
     required String orderId,
-    required int stars,
+    required int riderStars,
+    required int restaurantStars,
+    required int appStars,
     String? comment,
     List<String> tags = const [],
   }) async {
     final body = <String, dynamic>{
-      'stars': stars,
+      'riderStars': riderStars,
+      'restaurantStars': restaurantStars,
+      'appStars': appStars,
       if (comment != null && comment.isNotEmpty) 'comment': comment,
       if (tags.isNotEmpty) 'tags': tags,
     };
     try {
       await _client.post(ApiConstants.orderRating(orderId), data: body);
     } catch (_) {
-      // Fallback /reviews (back-compat avec l'ancien backend) — concatène
-      // les tags dans le commentaire pour ne rien perdre côté analytics.
+      // Fallback /reviews — concatène les tags + note app dans le commentaire
+      // pour ne rien perdre côté analytics.
       final mergedComment = [
         if (comment != null && comment.isNotEmpty) comment,
         if (tags.isNotEmpty) tags.join(', '),
+        'App : $appStars/5',
       ].join(' — ');
       await createReview(
         orderId: orderId,
-        cookRating: stars.toDouble(),
-        riderRating: stars.toDouble(),
-        riderComment: mergedComment.isEmpty ? null : mergedComment,
+        cookRating: restaurantStars.toDouble(),
+        riderRating: riderStars.toDouble(),
+        riderComment: mergedComment,
       );
     }
   }
