@@ -441,7 +441,7 @@ class ProfileScreen extends ConsumerWidget {
       _MenuEntry(Icons.location_on_outlined, 'Mes adresses',
           onTap: () => context.push('/onboarding/quartier')),
       _MenuEntry(Icons.receipt_long, 'Historique commandes',
-          onTap: () => context.go('/orders')),
+          onTap: () => context.push('/historique')),
       _MenuEntry(Icons.payments_outlined, 'Moyens de paiement (MoMo/OM)',
           onTap: () => _showPaymentMethodsSheet(context)),
       _MenuEntry(Icons.language, '${t('language', ref)} (FR/EN/Pidgin)',

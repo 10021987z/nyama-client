@@ -151,14 +151,28 @@ class OrdersRepository {
     print('[Rating] POST /orders/$orderId/rating body=$body');
 
     try {
-      await _client.post(ApiConstants.orderRating(orderId), data: body);
+      final resp =
+          await _client.post(ApiConstants.orderRating(orderId), data: body);
+      // ignore: avoid_print
+      print('[Rating] OK status=${resp.statusCode}');
     } on DioException catch (e) {
       // ignore: avoid_print
       print('[Rating] DioException ${e.type} status=${e.response?.statusCode} '
-          'path=${e.requestOptions.path} msg=${e.message}');
+          'path=${e.requestOptions.path} msg=${e.message} '
+          'body=${e.response?.data}');
+
+      final status = e.response?.statusCode;
+
+      // 409 ALREADY_RATED → traiter comme un succès idempotent : l'utilisateur
+      // a déjà noté cette commande, inutile de planter l'écran. La notation
+      // existe déjà en base, on retourne silencieusement.
+      if (status == 409) {
+        // ignore: avoid_print
+        print('[Rating] ALREADY_RATED — commande déjà notée, on retourne OK');
+        return;
+      }
 
       // Fallback /reviews UNIQUEMENT si l'endpoint rating n'existe pas (404/405).
-      final status = e.response?.statusCode;
       if (status == 404 || status == 405) {
         final mergedComment = [
           if (comment != null && comment.isNotEmpty) comment,

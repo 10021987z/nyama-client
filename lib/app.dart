@@ -155,6 +155,10 @@ class App extends StatelessWidget {
         builder: (c, s) => const OrderHistoryScreen(),
       ),
       GoRoute(
+        path: '/historique',
+        builder: (c, s) => const OrderHistoryScreen(),
+      ),
+      GoRoute(
         path: '/profile/payments',
         builder: (c, s) => const PaymentMethodsScreen(),
       ),

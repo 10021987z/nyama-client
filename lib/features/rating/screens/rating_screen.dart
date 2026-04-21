@@ -78,6 +78,10 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
+    // ignore: avoid_print
+    print('[Rating] submit start order=${widget.orderId} '
+        'rider=$_riderStars restaurant=$_restaurantStars app=$_appStars '
+        'tags=${_selectedTags.toList()}');
     setState(() => _submitting = true);
     try {
       await OrdersRepository().submitRating(
@@ -90,6 +94,8 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
             : _commentCtrl.text.trim(),
         tags: _selectedTags.toList(),
       );
+      // ignore: avoid_print
+      print('[Rating] submit success — showing thanks');
       if (!mounted) return;
       _showThanksAndGoHome();
     } catch (e, st) {
