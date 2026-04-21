@@ -35,6 +35,12 @@ class _RestaurantDetailScreenState
   Timer? _pollTimer;
   bool _socketHookInstalled = false;
 
+  /// IDs des plats fraîchement insérés via socket. Utilisé pour animer
+  /// le card correspondant (fadeIn + badge "Nouveau !") pendant 5s.
+  final ValueNotifier<Set<String>> _newItemIds =
+      ValueNotifier<Set<String>>(<String>{});
+  final Map<String, Timer> _newItemTimers = {};
+
   @override
   void initState() {
     super.initState();
@@ -56,8 +62,18 @@ class _RestaurantDetailScreenState
     try {
       if (data is Map) {
         final cookId = data['cookId']?.toString();
-        if (cookId == null || cookId == widget.restaurantId) {
-          _refreshMenu(reason: 'socket');
+        if (cookId != null && cookId != widget.restaurantId) return;
+
+        final action = data['action']?.toString();
+        final menuItem = data['menuItem'];
+
+        _refreshMenu(reason: 'socket');
+
+        if (action == 'created' && menuItem is Map) {
+          final id = menuItem['id']?.toString();
+          final name = menuItem['name']?.toString() ?? 'Nouveau plat';
+          if (id != null) _markItemAsNew(id);
+          _showNewItemToast(name);
         }
       } else {
         _refreshMenu(reason: 'socket-any');
@@ -65,6 +81,54 @@ class _RestaurantDetailScreenState
     } catch (_) {
       _refreshMenu(reason: 'socket-error-fallback');
     }
+  }
+
+  void _markItemAsNew(String id) {
+    final current = Set<String>.from(_newItemIds.value)..add(id);
+    _newItemIds.value = current;
+    _newItemTimers[id]?.cancel();
+    _newItemTimers[id] = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      final next = Set<String>.from(_newItemIds.value)..remove(id);
+      _newItemIds.value = next;
+      _newItemTimers.remove(id);
+    });
+  }
+
+  void _showNewItemToast(String itemName) {
+    if (!mounted) return;
+    final cookName = ref
+            .read(cookDetailProvider(widget.restaurantId))
+            .valueOrNull
+            ?.displayName ??
+        'Le restaurant';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        duration: const Duration(seconds: 4),
+        backgroundColor: AppColors.charcoal,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        content: Row(
+          children: [
+            const Text('✨', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$cookName a ajouté un nouveau plat : $itemName',
+                style: const TextStyle(
+                  fontFamily: AppTheme.bodyFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _startPolling() {
@@ -86,6 +150,11 @@ class _RestaurantDetailScreenState
   void dispose() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    for (final t in _newItemTimers.values) {
+      t.cancel();
+    }
+    _newItemTimers.clear();
+    _newItemIds.dispose();
     try {
       ref.read(socketServiceProvider).off('menu:updated');
     } catch (_) {}
@@ -113,6 +182,7 @@ class _RestaurantDetailScreenState
           cook: cook,
           cart: cart,
           cartNotifier: cartNotifier,
+          newItemIds: _newItemIds,
         ),
       ),
     );
@@ -125,11 +195,13 @@ class _RestaurantBody extends StatefulWidget {
   final Cook cook;
   final List<CartItem> cart;
   final CartNotifier cartNotifier;
+  final ValueNotifier<Set<String>> newItemIds;
 
   const _RestaurantBody({
     required this.cook,
     required this.cart,
     required this.cartNotifier,
+    required this.newItemIds,
   });
 
   @override
@@ -288,6 +360,7 @@ class _RestaurantBodyState extends State<_RestaurantBody>
                   cart: widget.cart,
                   cartNotifier: widget.cartNotifier,
                   bottomPadding: cartCount > 0 ? 80 : 24,
+                  newItemIds: widget.newItemIds,
                 ),
                 // Reviews tab
                 _ReviewsTab(
@@ -557,6 +630,7 @@ class _MenuTab extends StatelessWidget {
   final List<CartItem> cart;
   final CartNotifier cartNotifier;
   final double bottomPadding;
+  final ValueNotifier<Set<String>> newItemIds;
 
   const _MenuTab({
     required this.categories,
@@ -565,6 +639,7 @@ class _MenuTab extends StatelessWidget {
     required this.cart,
     required this.cartNotifier,
     required this.bottomPadding,
+    required this.newItemIds,
   });
 
   @override
@@ -630,11 +705,15 @@ class _MenuTab extends StatelessWidget {
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: _MenuItemCard(
-            item: item,
-            quantity: qty,
-            onTap: () => showProductSheet(context, item, cook, cartNotifier),
-            onAdd: () => _handleAdd(context, item),
+          child: ValueListenableBuilder<Set<String>>(
+            valueListenable: newItemIds,
+            builder: (ctx, ids, _) => _MenuItemCard(
+              item: item,
+              quantity: qty,
+              isNew: ids.contains(item.id),
+              onTap: () => showProductSheet(context, item, cook, cartNotifier),
+              onAdd: () => _handleAdd(context, item),
+            ),
           ),
         );
       },
@@ -707,6 +786,7 @@ class _MenuEntry {
 class _MenuItemCard extends StatelessWidget {
   final MenuItem item;
   final int quantity;
+  final bool isNew;
   final VoidCallback onTap;
   final VoidCallback onAdd;
 
@@ -715,21 +795,29 @@ class _MenuItemCard extends StatelessWidget {
     required this.quantity,
     required this.onTap,
     required this.onAdd,
+    this.isNew = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final card = GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          border: isNew
+              ? Border.all(color: AppColors.primary, width: 2)
+              : null,
           boxShadow: [
             BoxShadow(
-              color: AppColors.charcoal.withValues(alpha: 0.06),
-              blurRadius: 12,
+              color: isNew
+                  ? AppColors.primary.withValues(alpha: 0.28)
+                  : AppColors.charcoal.withValues(alpha: 0.06),
+              blurRadius: isNew ? 20 : 12,
               offset: const Offset(0, 2),
             ),
           ],
@@ -860,6 +948,10 @@ class _MenuItemCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (!isNew) return card;
+
+    return _NewItemHighlight(child: card);
   }
 
   Widget _imagePlaceholder() => Container(
@@ -868,6 +960,90 @@ class _MenuItemCard extends StatelessWidget {
           child: Icon(Icons.restaurant, color: AppColors.primary, size: 28),
         ),
       );
+}
+
+/// Wrap autour d'une card récemment ajoutée via socket : fadeIn + léger scale
+/// + badge "Nouveau !" en overlay pendant 5s (durée gérée par le parent).
+class _NewItemHighlight extends StatefulWidget {
+  final Widget child;
+  const _NewItemHighlight({required this.child});
+
+  @override
+  State<_NewItemHighlight> createState() => _NewItemHighlightState();
+}
+
+class _NewItemHighlightState extends State<_NewItemHighlight>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.96, end: 1).animate(
+          CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            widget.child,
+            Positioned(
+              top: -8,
+              right: 12,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('✨', style: TextStyle(fontSize: 11)),
+                    SizedBox(width: 4),
+                    Text(
+                      'NOUVEAU !',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: AppTheme.headlineFamily,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Reviews tab ────────────────────────────────────────────────────────────
