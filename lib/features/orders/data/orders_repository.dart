@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exceptions.dart';
 import 'models/order_models.dart';
 
 class CreateOrderRequest {
@@ -144,22 +146,48 @@ class OrdersRepository {
       if (comment != null && comment.isNotEmpty) 'comment': comment,
       if (tags.isNotEmpty) 'tags': tags,
     };
+
+    // ignore: avoid_print
+    print('[Rating] POST /orders/$orderId/rating body=$body');
+
     try {
       await _client.post(ApiConstants.orderRating(orderId), data: body);
-    } catch (_) {
-      // Fallback /reviews — concatène les tags + note app dans le commentaire
-      // pour ne rien perdre côté analytics.
-      final mergedComment = [
-        if (comment != null && comment.isNotEmpty) comment,
-        if (tags.isNotEmpty) tags.join(', '),
-        'App : $appStars/5',
-      ].join(' — ');
-      await createReview(
-        orderId: orderId,
-        cookRating: restaurantStars.toDouble(),
-        riderRating: riderStars.toDouble(),
-        riderComment: mergedComment,
-      );
+    } on DioException catch (e) {
+      // ignore: avoid_print
+      print('[Rating] DioException ${e.type} status=${e.response?.statusCode} '
+          'path=${e.requestOptions.path} msg=${e.message}');
+
+      // Fallback /reviews UNIQUEMENT si l'endpoint rating n'existe pas (404/405).
+      final status = e.response?.statusCode;
+      if (status == 404 || status == 405) {
+        final mergedComment = [
+          if (comment != null && comment.isNotEmpty) comment,
+          if (tags.isNotEmpty) tags.join(', '),
+          'App : $appStars/5',
+        ].join(' — ');
+        await createReview(
+          orderId: orderId,
+          cookRating: restaurantStars.toDouble(),
+          riderRating: riderStars.toDouble(),
+          riderComment: mergedComment,
+        );
+        return;
+      }
+
+      // Propage un ApiException lisible plutôt que le DioException brut —
+      // la SnackBar côté UI affichera e.message (vrai message backend).
+      final inner = e.error;
+      if (inner is ApiException) {
+        throw inner;
+      }
+      throw ApiExceptionHandler.handle(e);
+    } on ApiException {
+      // Déjà normalisée plus bas dans la chaîne — re-throw tel quel.
+      rethrow;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Rating] erreur inattendue: $e');
+      rethrow;
     }
   }
 }

@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/network/api_exceptions.dart';
 import '../../../core/services/auth_gate.dart';
 import '../../orders/data/orders_repository.dart';
 import '../../orders/providers/orders_provider.dart';
@@ -90,11 +92,31 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
       );
       if (!mounted) return;
       _showThanksAndGoHome();
-    } catch (e) {
+    } catch (e, st) {
+      // Log complet pour diagnostiquer en release.
+      // ignore: avoid_print
+      print('[Rating] submit failed: $e\n$st');
+
       if (!mounted) return;
+
+      // Extrait un message lisible pour l'utilisateur — PAS de string hardcodée.
+      String msg;
+      if (e is ApiException) {
+        msg = e.message;
+      } else if (e is DioException) {
+        final inner = e.error;
+        if (inner is ApiException) {
+          msg = inner.message;
+        } else {
+          msg = e.message ?? e.toString();
+        }
+      } else {
+        msg = e.toString();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur : ${e.toString()}'),
+          content: Text('Erreur : $msg'),
           backgroundColor: AppColors.errorRed,
         ),
       );
