@@ -71,6 +71,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Connecte le Socket.IO avec le token persisté. Appelé après chaque
   /// auth réussie (OTP, Firebase, email, Google, restore session).
   Future<void> _connectSocket({String? userId}) async {
+    // ignore: avoid_print
+    print('[AuthNotifier] 🔌 ENTER _connectSocket(userId=$userId)');
     final token = await SecureStorage.getAccessToken();
     if (token == null || token.isEmpty) {
       // ignore: avoid_print
@@ -78,11 +80,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
     final resolvedId = userId ?? await SecureStorage.getUserId();
+    final preview = token.length >= 20 ? token.substring(0, 20) : token;
+    // ignore: avoid_print
+    print(
+      '[AuthNotifier] 🔌 calling SocketService.connect token=$preview... userId=$resolvedId',
+    );
     await SocketService.instance.connect(
       token,
       userId: resolvedId,
       role: 'CLIENT',
     );
+    // ignore: avoid_print
+    print('[AuthNotifier] 🔌 EXIT _connectSocket()');
   }
 
   /// Vérifie si une session existe au démarrage de l'app
@@ -176,6 +185,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 1) Si on a un verificationId Firebase → verifyOTP Firebase + sync backend.
   /// 2) Sinon / si Firebase KO → fallback API NYAMA (+ bypass 123456).
   Future<void> verifyOtp(String phone, String code) async {
+    // ignore: avoid_print
+    print('[AuthNotifier] verifyOtp(phone=$phone) — firebaseId=${_firebaseVerificationId != null ? "present" : "null"}');
     state = AuthState(status: AuthStatus.verifying, phone: phone);
 
     // ─── Path 1 : Firebase ────────────────────────────────────────────────
@@ -191,10 +202,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
           phone: phone,
           isNewUser: cred.additionalUserInfo?.isNewUser ?? false,
         );
+        // ignore: avoid_print
+        print('[AuthNotifier] verifyOtp Firebase path OK → _connectSocket');
         await _connectSocket(userId: user.id);
         return;
       } catch (e) {
-        // Firebase OTP refusé → on tente le fallback API (bypass 123456)
+        // ignore: avoid_print
+        print('[AuthNotifier] verifyOtp Firebase path FAILED: $e — fallback API');
       }
     }
 
@@ -208,8 +222,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: user,
         phone: phone,
       );
+      // ignore: avoid_print
+      print('[AuthNotifier] verifyOtp API path OK → _connectSocket');
       await _connectSocket(userId: user.id);
     } catch (e) {
+      // ignore: avoid_print
+      print('[AuthNotifier] verifyOtp API path FAILED: $e');
       if (!mounted) return;
       state = AuthState(
         status: AuthStatus.error,

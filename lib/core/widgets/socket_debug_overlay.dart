@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../network/socket_service.dart';
+import '../storage/secure_storage.dart';
 
 /// Bandeau fixe en bas d'écran qui affiche l'état temps-réel du socket.io.
-/// Tap → dialog détaillé avec url, token preview, dernière erreur, dernier event.
+/// Tap → dialog détaillé. Appui long → force SocketService.connect() avec le
+/// token stocké (test manuel pour isoler un bug d'intégration auth).
 class SocketDebugOverlay extends StatelessWidget {
   const SocketDebugOverlay({super.key});
+
+  static const String _role = 'CLIENT';
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +21,7 @@ class SocketDebugOverlay extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: () => _showDetails(context, info),
+            onLongPress: () => _forceConnect(context),
             child: Container(
               height: 40,
               alignment: Alignment.center,
@@ -148,6 +153,43 @@ class SocketDebugOverlay extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _forceConnect(BuildContext context) async {
+    // ignore: avoid_print
+    print('[SocketDebugOverlay] 🔌 LONG PRESS — forcing connect()');
+    final token = await SecureStorage.getAccessToken();
+    final userId = await SecureStorage.getUserId();
+    final preview =
+        (token != null && token.length >= 20) ? token.substring(0, 20) : token;
+    // ignore: avoid_print
+    print(
+      '[SocketDebugOverlay] token=$preview... userId=$userId role=$_role',
+    );
+    if (!context.mounted) return;
+    if (token == null || token.isEmpty) {
+      // ignore: avoid_print
+      print('[SocketDebugOverlay] ❌ no token in storage — login d\'abord');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pas de token — connecte-toi d\'abord'),
+          backgroundColor: Color(0xFFC62828),
+        ),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Force connect() avec token stocké…'),
+        backgroundColor: Color(0xFF1565C0),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    await SocketService.instance.connect(
+      token,
+      userId: userId,
+      role: _role,
     );
   }
 }
