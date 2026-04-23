@@ -13,39 +13,34 @@ class SocketDebugOverlay extends StatelessWidget {
       builder: (context, info, _) {
         final color = _colorFor(info.state);
         final label = _labelFor(info);
-        return Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _showDetails(context, info),
-              child: Container(
-                height: 40,
-                alignment: Alignment.center,
-                color: color,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showDetails(context, info),
+            child: Container(
+              height: 40,
+              alignment: Alignment.center,
+              color: color,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.info_outline,
-                        size: 14, color: Colors.white70),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.info_outline,
+                      size: 14, color: Colors.white70),
+                ],
               ),
             ),
           ),

@@ -224,7 +224,37 @@ class App extends StatelessWidget {
         return Stack(
           children: [
             child ?? const SizedBox.shrink(),
-            const SocketDebugOverlay(),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  height: 60,
+                  color: Colors.red,
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'SOCKET DEBUG OVERLAY ACTIF',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: SocketDebugOverlay(),
+              ),
+            ),
           ],
         );
       },
