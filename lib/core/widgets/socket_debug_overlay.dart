@@ -22,13 +22,17 @@ class SocketDebugOverlay extends StatelessWidget {
           child: InkWell(
             onTap: () => _showDetails(context, info),
             onLongPress: () => _forceConnect(context),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
-              height: 40,
+              height: 32,
               alignment: Alignment.center,
-              color: color,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
                     child: Text(
@@ -37,14 +41,14 @@ class SocketDebugOverlay extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   const Icon(Icons.info_outline,
-                      size: 14, color: Colors.white70),
+                      size: 12, color: Colors.white70),
                 ],
               ),
             ),
