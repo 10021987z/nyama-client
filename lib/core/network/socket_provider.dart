@@ -3,22 +3,24 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../storage/secure_storage.dart';
 import 'socket_service.dart';
 
+/// Exposes the [SocketService] singleton to widgets via Riverpod.
+///
+/// Also acts as a safety-net listener on [authStateProvider] to
+/// (dis)connect on auth transitions — the primary connect call lives
+/// inside [AuthNotifier] after a successful login.
 final socketServiceProvider = Provider<SocketService>((ref) {
-  final service = SocketService();
+  final service = SocketService.instance;
 
-  // Connect/disconnect based on auth state
   ref.listen<AuthState>(authStateProvider, (previous, next) async {
     if (next.isAuthenticated) {
       final token = await SecureStorage.getAccessToken();
-      if (token != null) {
-        service.connect(token);
+      if (token != null && token.isNotEmpty && !service.isConnected) {
+        await service.connect(token, role: 'CLIENT');
       }
-    } else {
+    } else if (previous?.isAuthenticated == true) {
       service.disconnect();
     }
   }, fireImmediately: true);
-
-  ref.onDispose(() => service.disconnect());
 
   return service;
 });

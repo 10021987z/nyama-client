@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/network/socket_service.dart';
 import '../../../core/services/firebase_auth_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../data/auth_repository.dart';
@@ -67,6 +68,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     checkAuth();
   }
 
+  /// Connecte le Socket.IO avec le token persisté. Appelé après chaque
+  /// auth réussie (OTP, Firebase, email, Google, restore session).
+  Future<void> _connectSocket({String? userId}) async {
+    final token = await SecureStorage.getAccessToken();
+    if (token == null || token.isEmpty) {
+      // ignore: avoid_print
+      print('[AuthNotifier] 🔌 skip socket connect — no token');
+      return;
+    }
+    final resolvedId = userId ?? await SecureStorage.getUserId();
+    await SocketService.instance.connect(
+      token,
+      userId: resolvedId,
+      role: 'CLIENT',
+    );
+  }
+
   /// Vérifie si une session existe au démarrage de l'app
   Future<void> checkAuth() async {
     final loggedIn = await _repo.isLoggedIn();
@@ -81,6 +99,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           ? AppUser(id: id, phone: phone, name: localName)
           : null;
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      await _connectSocket(userId: user?.id);
 
       // Puis tente de rafraîchir depuis l'API GET /users/me (non bloquant)
       try {
@@ -165,12 +184,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final cred = await _firebase.verifyOTP(_firebaseVerificationId!, code);
         final result = await _syncFirebaseWithBackend(cred.user, phone: phone);
         if (!mounted) return;
+        final user = result.user ?? AppUser(id: cred.user?.uid ?? '', phone: phone);
         state = AuthState(
           status: AuthStatus.authenticated,
-          user: result.user ?? AppUser(id: cred.user?.uid ?? '', phone: phone),
+          user: user,
           phone: phone,
           isNewUser: cred.additionalUserInfo?.isNewUser ?? false,
         );
+        await _connectSocket(userId: user.id);
         return;
       } catch (e) {
         // Firebase OTP refusé → on tente le fallback API (bypass 123456)
@@ -181,11 +202,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final result = await _repo.verifyOtp(phone, code);
       if (!mounted) return;
+      final user = result.user ?? AppUser(id: '', phone: phone);
       state = AuthState(
         status: AuthStatus.authenticated,
-        user: result.user ?? AppUser(id: '', phone: phone),
+        user: user,
         phone: phone,
       );
+      await _connectSocket(userId: user.id);
     } catch (e) {
       if (!mounted) return;
       state = AuthState(
@@ -214,11 +237,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       final result = await _syncFirebaseWithBackend(cred.user, email: email);
       if (!mounted) return;
+      final user = result.user ?? AppUser(id: cred.user?.uid ?? '', phone: email);
       state = AuthState(
         status: AuthStatus.authenticated,
-        user: result.user ?? AppUser(id: cred.user?.uid ?? '', phone: email),
+        user: user,
         isNewUser: isSignUp,
       );
+      await _connectSocket(userId: user.id);
     } catch (e) {
       if (!mounted) return;
       state = AuthState(
@@ -238,16 +263,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: cred.user?.email,
       );
       if (!mounted) return;
+      final user = result.user ??
+          AppUser(
+            id: cred.user?.uid ?? '',
+            phone: cred.user?.email ?? '',
+            name: cred.user?.displayName,
+          );
       state = AuthState(
         status: AuthStatus.authenticated,
-        user: result.user ??
-            AppUser(
-              id: cred.user?.uid ?? '',
-              phone: cred.user?.email ?? '',
-              name: cred.user?.displayName,
-            ),
+        user: user,
         isNewUser: cred.additionalUserInfo?.isNewUser ?? false,
       );
+      await _connectSocket(userId: user.id);
     } catch (e) {
       if (!mounted) return;
       state = AuthState(
@@ -308,6 +335,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _firebase.signOut();
     } catch (_) {}
     await _repo.logout();
+    SocketService.instance.disconnect();
     if (!mounted) return;
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
