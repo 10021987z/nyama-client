@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/socket_debug_overlay.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/phone_input_screen.dart';
@@ -26,6 +27,9 @@ import 'features/payment/screens/payment_success_screen.dart';
 import 'features/rating/screens/rating_screen.dart';
 import 'features/rider_signup/screens/rider_signup_screen.dart';
 import 'features/search/screens/map_view_screen.dart';
+
+/// Flag global — passe à `false` pour cacher le bandeau debug socket en prod.
+const bool kShowSocketDebug = true;
 
 class App extends StatelessWidget {
   App({super.key});
@@ -215,6 +219,15 @@ class App extends StatelessWidget {
         Locale('fr', 'FR'),
         Locale('en', 'US'),
       ],
+      builder: (context, child) {
+        if (!kShowSocketDebug) return child ?? const SizedBox.shrink();
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const SocketDebugOverlay(),
+          ],
+        );
+      },
     );
   }
 }
